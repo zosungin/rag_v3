@@ -1,0 +1,55 @@
+# 수동 실행: 스테이징/운영 API에 대해 10질의 채팅 품질 점검 (실 LLM 호출)
+# Secrets 불필요 — workflow 입력으로 베이스 URL 전달
+# 주의: GitHub 호스티드 러너는 사내망(192.168.x.x)에 직접 도달하지 못할 수 있음. 그 경우 서버 cron으로 scripts/qa_10_eval.py 실행.
+
+name: RAG chat QA10
+
+on:
+  workflow_dispatch:
+    inputs:
+      base_url:
+        description: "API 베이스 URL (예: https://staging.example.com:8000)"
+        required: true
+        default: "http://127.0.0.1:8000"
+      delay_sec:
+        description: "질의 간 대기(초) — 부하 완화"
+        required: false
+        default: "2"
+      timeout_sec:
+        description: "질의당 타임아웃(초)"
+        required: false
+        default: "240"
+
+jobs:
+  qa10:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install requests
+        run: pip install requests
+      - name: Run scripts/qa_10_eval.py
+        env:
+          TEST_API_BASE_URL: ${{ github.event.inputs.base_url || 'http://127.0.0.1:8000' }}
+          QA10_DELAY_SEC: ${{ github.event.inputs.delay_sec || '2' }}
+        run: |
+          python scripts/qa_10_eval.py \
+            --base-url "${TEST_API_BASE_URL}" \
+            --delay "${QA10_DELAY_SEC}" \
+            --timeout ${{ github.event.inputs.timeout_sec || '240' }} \
+            --json-out artifacts/qa10_chat_report.json \
+            --md-out artifacts/qa10_operational_report.md
+      - name: Aggregate triage summary (optional merge)
+        if: success() || failure()
+        run: python scripts/aggregate_quality_metrics.py --qa10-report artifacts/qa10_chat_report.json
+      - name: Upload reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: qa10-operational-reports
+          path: |
+            artifacts/qa10_chat_report.json
+            artifacts/qa10_operational_report.md
+            artifacts/quality_triage_summary.md

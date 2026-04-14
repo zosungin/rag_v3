@@ -1,0 +1,811 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Zabbix RAG 검색 시스템</title>
+    <style>
+        /* ───────────────────────────────────────────
+           BASE RESET & TOKENS
+        ─────────────────────────────────────────── */
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        :root {
+            /* Backgrounds */
+            --bg-root:   #0f1115;
+            --bg-panel:  #0b0d12;
+            --bg-surface:#0e1018;
+            --bg-deep:   #090a0f;
+
+            /* Borders */
+            --border:    #1c2230;
+            --border-md: #1c2a3a;
+
+            /* Amber accent */
+            --amber:     #f59e0b;
+            --amber-dim: #b07820;
+            --amber-dark:#6a5015;
+
+            /* Text hierarchy */
+            --text-hi:   #c8cdd8;   /* primary readable text  */
+            --text-mid:  #7a8a9e;   /* secondary / body       */
+            --text-lo:   #3a4a60;   /* muted labels           */
+            --text-ghost:#1c2a3a;   /* very subtle placeholders*/
+
+            /* Semantic colours */
+            --green:     #10b981;
+            --blue:      #60a5fa;
+            --violet:    #a78bfa;
+            --red:       #f87171;
+
+            /* Typography */
+            --font-mono: 'Courier New', Courier, monospace;
+            --font-sans: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+
+        html, body {
+            height: 100%;
+            font-family: var(--font-mono);
+            background: var(--bg-root);
+            color: var(--text-hi);
+            min-height: 100vh;
+        }
+
+        /* ───────────────────────────────────────────
+           LAYOUT WRAPPER
+        ─────────────────────────────────────────── */
+        .page-wrapper {
+            max-width: 1080px;
+            margin: 0 auto;
+            padding: 28px 20px 48px;
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+        }
+
+        /* ───────────────────────────────────────────
+           HEADER / TITLE BAR
+        ─────────────────────────────────────────── */
+        .header {
+            display: flex;
+            align-items: center;
+            gap: 14px;
+            padding: 14px 20px;
+            background: var(--bg-panel);
+            border: 2px solid var(--border);
+            border-radius: 4px;
+        }
+
+        .header-logo {
+            width: 36px;
+            height: 36px;
+            border-radius: 4px;
+            background: var(--bg-root);
+            border: 2px solid var(--amber);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 15px;
+            font-weight: 700;
+            color: var(--amber);
+            flex-shrink: 0;
+        }
+
+        .header-text {
+            flex: 1;
+        }
+
+        .header-text h1 {
+            font-size: 1.05rem;
+            font-weight: 700;
+            color: var(--text-hi);
+            letter-spacing: 0.07em;
+            line-height: 1.2;
+        }
+
+        .header-text .subtitle {
+            font-size: 0.72rem;
+            color: var(--amber);
+            letter-spacing: 0.14em;
+            margin-top: 2px;
+        }
+
+        .header-status {
+            display: flex;
+            gap: 14px;
+        }
+
+        .status-dot {
+            display: flex;
+            align-items: center;
+            gap: 5px;
+            font-size: 0.72rem;
+            color: var(--green);
+            letter-spacing: 0.08em;
+        }
+
+        .status-dot::before {
+            content: '';
+            display: block;
+            width: 5px;
+            height: 5px;
+            border-radius: 50%;
+            background: var(--green);
+        }
+
+        /* ───────────────────────────────────────────
+           SEARCH BOX
+        ─────────────────────────────────────────── */
+        .search-box {
+            background: var(--bg-panel);
+            border: 2px solid var(--border);
+            border-radius: 4px;
+            padding: 20px 22px;
+        }
+
+        .search-box-label {
+            font-size: 0.65rem;
+            color: var(--border);
+            letter-spacing: 0.18em;
+            margin-bottom: 10px;
+        }
+
+        .search-input-group {
+            display: flex;
+            gap: 8px;
+            margin-bottom: 16px;
+        }
+
+        .input-wrapper {
+            flex: 1;
+            display: flex;
+            align-items: center;
+            gap: 0;
+            background: var(--bg-deep);
+            border: 1px solid var(--border);
+            border-radius: 3px;
+            padding: 0 12px;
+        }
+
+        .input-prompt {
+            color: var(--amber);
+            font-size: 1rem;
+            font-weight: 700;
+            margin-right: 8px;
+            flex-shrink: 0;
+        }
+
+        #questionInput {
+            flex: 1;
+            padding: 12px 0;
+            font-size: 0.95rem;
+            font-family: var(--font-mono);
+            background: transparent;
+            border: none;
+            outline: none;
+            color: var(--text-hi);
+            letter-spacing: 0.02em;
+        }
+
+        #questionInput::placeholder {
+            color: var(--text-ghost);
+        }
+
+        .input-wrapper:focus-within {
+            border-color: rgba(245, 158, 11, 0.45);
+        }
+
+        .search-btn {
+            padding: 12px 26px;
+            background: var(--amber);
+            color: #0a0b10;
+            border: none;
+            border-radius: 3px;
+            font-size: 0.82rem;
+            font-weight: 700;
+            font-family: var(--font-mono);
+            cursor: pointer;
+            letter-spacing: 0.08em;
+            transition: opacity 0.15s;
+            flex-shrink: 0;
+        }
+
+        .search-btn:hover { opacity: 0.88; }
+
+        .search-btn:disabled {
+            opacity: 0.45;
+            cursor: not-allowed;
+        }
+
+        /* OPTIONS ROW */
+        .options {
+            display: flex;
+            gap: 24px;
+            align-items: center;
+            padding-top: 6px;
+            border-top: 1px solid var(--border);
+        }
+
+        .option-group {
+            display: flex;
+            align-items: center;
+            gap: 9px;
+        }
+
+        .option-group label {
+            font-size: 0.8rem;
+            color: var(--text-lo);
+            letter-spacing: 0.05em;
+        }
+
+        .option-group input[type="number"] {
+            width: 72px;
+            padding: 6px 9px;
+            background: var(--bg-deep);
+            border: 1px solid var(--border);
+            border-radius: 3px;
+            color: var(--text-hi);
+            font-size: 0.85rem;
+            font-family: var(--font-mono);
+            outline: none;
+        }
+
+        .option-group input[type="number"]:focus {
+            border-color: rgba(245, 158, 11, 0.4);
+        }
+
+        /* custom checkbox */
+        .option-group input[type="checkbox"] {
+            appearance: none;
+            -webkit-appearance: none;
+            width: 16px;
+            height: 16px;
+            border: 1px solid var(--border-md);
+            border-radius: 2px;
+            background: var(--bg-deep);
+            cursor: pointer;
+            position: relative;
+            flex-shrink: 0;
+        }
+
+        .option-group input[type="checkbox"]:checked {
+            background: rgba(245, 158, 11, 0.15);
+            border-color: var(--amber);
+        }
+
+        .option-group input[type="checkbox"]:checked::after {
+            content: '✓';
+            position: absolute;
+            top: -1px;
+            left: 2px;
+            font-size: 11px;
+            color: var(--amber);
+            font-weight: 700;
+        }
+
+        /* ───────────────────────────────────────────
+           RESULTS CONTAINER
+        ─────────────────────────────────────────── */
+        .results-container {
+            background: var(--bg-panel);
+            border: 2px solid var(--border);
+            border-radius: 4px;
+            overflow: hidden;
+            display: none;
+        }
+
+        .results-container.show {
+            display: block;
+        }
+
+        /* STATS BAR */
+        .stats-bar {
+            display: flex;
+            justify-content: flex-start;
+            gap: 0;
+            background: var(--bg-deep);
+            border-bottom: 1px solid var(--border);
+            padding: 0;
+        }
+
+        .stat-item {
+            text-align: center;
+            padding: 12px 28px;
+            border-right: 1px solid var(--border);
+        }
+
+        .stat-value {
+            font-size: 1.45rem;
+            font-weight: 700;
+            color: var(--amber);
+            line-height: 1.1;
+        }
+
+        .stat-label {
+            font-size: 0.65rem;
+            color: var(--text-lo);
+            margin-top: 3px;
+            letter-spacing: 0.1em;
+            text-transform: uppercase;
+        }
+
+        /* QUERY ANALYSIS */
+        .query-analysis {
+            background: rgba(245, 158, 11, 0.04);
+            border-bottom: 1px solid var(--border);
+            padding: 14px 20px;
+        }
+
+        .query-analysis h4 {
+            font-size: 0.7rem;
+            color: var(--amber-dark);
+            letter-spacing: 0.12em;
+            margin-bottom: 10px;
+            text-transform: uppercase;
+        }
+
+        .filter-tags {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+        }
+
+        .filter-tag {
+            padding: 4px 12px;
+            background: rgba(245, 158, 11, 0.1);
+            border: 1px solid rgba(245, 158, 11, 0.25);
+            color: var(--amber-dim);
+            border-radius: 2px;
+            font-size: 0.8rem;
+            letter-spacing: 0.03em;
+        }
+
+        /* ANSWER SECTION */
+        .answer-section {
+            padding: 18px 20px;
+            border-bottom: 1px solid var(--border);
+            border-left: 3px solid var(--amber);
+            background: var(--bg-surface);
+        }
+
+        .answer-section h3 {
+            font-size: 0.7rem;
+            color: var(--amber-dark);
+            letter-spacing: 0.12em;
+            text-transform: uppercase;
+            margin-bottom: 12px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .answer-section h3::before {
+            content: '■';
+            color: var(--amber);
+            font-size: 0.6rem;
+        }
+
+        .answer-text {
+            font-size: 0.95rem;
+            line-height: 1.8;
+            color: var(--text-mid);
+            font-family: var(--font-sans);
+            white-space: pre-wrap;
+            word-break: break-word;
+        }
+
+        /* SOURCES SECTION */
+        .sources-section {
+            padding: 0;
+        }
+
+        .sources-section h3 {
+            font-size: 0.7rem;
+            color: var(--text-lo);
+            letter-spacing: 0.12em;
+            text-transform: uppercase;
+            padding: 12px 20px 8px;
+            border-bottom: 1px solid var(--border);
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            background: var(--bg-deep);
+        }
+
+        .source-card {
+            background: var(--bg-surface);
+            border-bottom: 1px solid var(--border);
+            padding: 16px 20px;
+            transition: background 0.15s;
+        }
+
+        .source-card:last-child {
+            border-bottom: none;
+        }
+
+        .source-card:hover {
+            background: rgba(245, 158, 11, 0.03);
+        }
+
+        .source-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            margin-bottom: 12px;
+        }
+
+        .source-title h4 {
+            font-size: 0.9rem;
+            color: var(--text-hi);
+            margin-bottom: 4px;
+            letter-spacing: 0.02em;
+        }
+
+        .source-title .host-name {
+            font-size: 0.78rem;
+            color: var(--text-lo);
+            letter-spacing: 0.04em;
+        }
+
+        .similarity-badge {
+            padding: 4px 12px;
+            background: rgba(16, 185, 129, 0.1);
+            border: 1px solid rgba(16, 185, 129, 0.3);
+            color: var(--green);
+            border-radius: 2px;
+            font-size: 0.78rem;
+            font-weight: 700;
+            letter-spacing: 0.04em;
+            flex-shrink: 0;
+        }
+
+        /* source detail grid */
+        .source-details {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+            gap: 10px;
+        }
+
+        .detail-item {
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+        }
+
+        .detail-label {
+            font-size: 0.65rem;
+            color: var(--text-ghost);
+            text-transform: uppercase;
+            letter-spacing: 0.12em;
+        }
+
+        .detail-value {
+            font-size: 0.85rem;
+            color: var(--text-mid);
+            font-weight: 500;
+        }
+
+        /* STATUS BADGES */
+        .status-badge {
+            display: inline-block;
+            padding: 2px 8px;
+            border-radius: 2px;
+            font-size: 0.72rem;
+            font-weight: 700;
+            letter-spacing: 0.05em;
+        }
+
+        .status-normal {
+            background: rgba(16, 185, 129, 0.1);
+            border: 1px solid rgba(16, 185, 129, 0.25);
+            color: var(--green);
+        }
+
+        .status-warning {
+            background: rgba(245, 158, 11, 0.1);
+            border: 1px solid rgba(245, 158, 11, 0.25);
+            color: var(--amber-dim);
+        }
+
+        .status-critical {
+            background: rgba(248, 113, 113, 0.1);
+            border: 1px solid rgba(248, 113, 113, 0.25);
+            color: var(--red);
+        }
+
+        /* ───────────────────────────────────────────
+           LOADING
+        ─────────────────────────────────────────── */
+        .loading {
+            text-align: center;
+            padding: 48px 20px;
+            color: var(--amber-dim);
+        }
+
+        .loading-spinner {
+            width: 36px;
+            height: 36px;
+            border: 2px solid var(--border);
+            border-top: 2px solid var(--amber);
+            border-radius: 50%;
+            animation: spin 0.9s linear infinite;
+            margin: 0 auto 16px;
+        }
+
+        .loading p {
+            font-size: 0.8rem;
+            letter-spacing: 0.1em;
+            color: var(--text-lo);
+        }
+
+        @keyframes spin {
+            0%   { transform: rotate(0deg);   }
+            100% { transform: rotate(360deg); }
+        }
+
+        /* ───────────────────────────────────────────
+           ERROR
+        ─────────────────────────────────────────── */
+        .error-message {
+            background: rgba(248, 113, 113, 0.07);
+            border: 1px solid rgba(248, 113, 113, 0.25);
+            border-left: 3px solid var(--red);
+            color: var(--red);
+            padding: 16px 20px;
+            border-radius: 3px;
+            font-size: 0.88rem;
+            line-height: 1.7;
+        }
+
+        /* ───────────────────────────────────────────
+           RESPONSIVE
+        ─────────────────────────────────────────── */
+        @media (max-width: 768px) {
+            .header-status { display: none; }
+
+            .search-input-group {
+                flex-direction: column;
+            }
+
+            .search-btn {
+                width: 100%;
+            }
+
+            .options {
+                flex-direction: column;
+                align-items: flex-start;
+                gap: 12px;
+            }
+
+            .source-details {
+                grid-template-columns: 1fr 1fr;
+            }
+
+            .stat-item {
+                padding: 10px 18px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="page-wrapper">
+
+        <!-- ── HEADER ── -->
+        <div class="header">
+            <div class="header-logo">Z</div>
+            <div class="header-text">
+                <h1>ZABBIX RAG 검색 시스템</h1>
+                <div class="subtitle">OPS INTELLIGENCE · 서버 모니터링 메트릭을 자연어로 검색하세요</div>
+            </div>
+            <div class="header-status">
+                <span class="status-dot">SYS</span>
+                <span class="status-dot">DB</span>
+                <span class="status-dot">LLM</span>
+            </div>
+        </div>
+
+        <!-- ── SEARCH BOX ── -->
+        <div class="search-box">
+            <div class="search-box-label"># QUERY INPUT</div>
+
+            <div class="search-input-group">
+                <div class="input-wrapper">
+                    <span class="input-prompt">❯</span>
+                    <input
+                        type="text"
+                        id="questionInput"
+                        placeholder="예: 정상 작동 중인 서버는? / CPU 사용률이 높은 서버는?"
+                        onkeypress="if(event.key==='Enter') searchMetrics()"
+                    >
+                </div>
+                <button class="search-btn" onclick="searchMetrics()">EXECUTE ↵</button>
+            </div>
+
+            <div class="options">
+                <div class="option-group">
+                    <label for="topK">결과 개수</label>
+                    <input type="number" id="topK" value="5" min="1" max="20">
+                </div>
+                <div class="option-group">
+                    <input type="checkbox" id="useLLM" checked>
+                    <label for="useLLM">LLM 답변 생성</label>
+                </div>
+            </div>
+        </div>
+
+        <!-- ── LOADING ── -->
+        <div id="loadingDiv" class="results-container" style="display: none;">
+            <div class="loading">
+                <div class="loading-spinner"></div>
+                <p>QUERYING…</p>
+            </div>
+        </div>
+
+        <!-- ── RESULTS ── -->
+        <div id="resultsDiv" class="results-container">
+            <!-- 결과가 여기에 표시됩니다 -->
+        </div>
+
+    </div><!-- /page-wrapper -->
+
+    <script>
+        async function searchMetrics() {
+            const question = document.getElementById('questionInput').value.trim();
+            const topK = parseInt(document.getElementById('topK').value);
+            const useLLM = document.getElementById('useLLM').checked;
+
+            if (!question) {
+                alert('질문을 입력해 주세요.');
+                return;
+            }
+
+            // Show loading
+            document.getElementById('loadingDiv').style.display = 'block';
+            document.getElementById('resultsDiv').classList.remove('show');
+
+            try {
+                const response = await fetch('/api/search', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        question: question,
+                        top_k: topK,
+                        use_llm: useLLM
+                    })
+                });
+
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+
+                const data = await response.json();
+                displayResults(data);
+
+            } catch (error) {
+                displayError(error.message);
+            } finally {
+                document.getElementById('loadingDiv').style.display = 'none';
+            }
+        }
+
+        function displayResults(data) {
+            const resultsDiv = document.getElementById('resultsDiv');
+
+            let html = '';
+
+            // Stats Bar
+            html += `
+                <div class="stats-bar">
+                    <div class="stat-item">
+                        <div class="stat-value">${data.sources.length}</div>
+                        <div class="stat-label">검색 결과</div>
+                    </div>
+                    <div class="stat-item">
+                        <div class="stat-value">${Object.keys(data.query_analysis).length}</div>
+                        <div class="stat-label">필터 조건</div>
+                    </div>
+                </div>
+            `;
+
+            // Query Analysis
+            if (Object.keys(data.query_analysis).length > 0) {
+                html += `
+                    <div class="query-analysis">
+                        <h4>질의 분석 결과</h4>
+                        <div class="filter-tags">
+                `;
+                for (const [key, value] of Object.entries(data.query_analysis)) {
+                    html += `<span class="filter-tag">${key}: ${value}</span>`;
+                }
+                html += `
+                        </div>
+                    </div>
+                `;
+            }
+
+            // Answer Section
+            html += `
+                <div class="answer-section">
+                    <h3>RESPONSE</h3>
+                    <div class="answer-text">${data.answer}</div>
+                </div>
+            `;
+
+            // Sources Section
+            if (data.sources.length > 0) {
+                html += `
+                    <div class="sources-section">
+                        <h3>검색 결과 (${data.sources.length}건)</h3>
+                `;
+
+                data.sources.forEach((source, index) => {
+                    const statusClass = source.status_level ?
+                        `status-${source.status_level}` : '';
+                    const statusText = source.status_level || 'N/A';
+                    const similarity = (source.similarity * 100).toFixed(1);
+
+                    html += `
+                        <div class="source-card">
+                            <div class="source-header">
+                                <div class="source-title">
+                                    <h4>${index + 1}. ${source.item_name}</h4>
+                                    <div class="host-name">🖥 ${source.host_name}</div>
+                                </div>
+                                <div class="similarity-badge">${similarity}%</div>
+                            </div>
+
+                            <div class="source-details">
+                                <div class="detail-item">
+                                    <div class="detail-label">상태</div>
+                                    <div class="detail-value">
+                                        <span class="status-badge ${statusClass}">${statusText}</span>
+                                    </div>
+                                </div>
+                                <div class="detail-item">
+                                    <div class="detail-label">이상 점수</div>
+                                    <div class="detail-value">${source.anomaly_score ? source.anomaly_score.toFixed(1) + '점' : 'N/A'}</div>
+                                </div>
+                                <div class="detail-item">
+                                    <div class="detail-label">현재 값</div>
+                                    <div class="detail-value">${source.current_value !== null ? source.current_value : 'N/A'}</div>
+                                </div>
+                                <div class="detail-item">
+                                    <div class="detail-label">평균 값</div>
+                                    <div class="detail-value">${source.value_avg !== null ? source.value_avg : 'N/A'}</div>
+                                </div>
+                            </div>
+                        </div>
+                    `;
+                });
+
+                html += `</div>`;
+            }
+
+            resultsDiv.innerHTML = html;
+            resultsDiv.classList.add('show');
+        }
+
+        function displayError(message) {
+            const resultsDiv = document.getElementById('resultsDiv');
+            resultsDiv.innerHTML = `
+                <div class="error-message">
+                    <strong>❌ 오류 발생</strong><br>
+                    ${message}
+                </div>
+            `;
+            resultsDiv.classList.add('show');
+        }
+
+        // 페이지 로드 시 예시 질문 표시
+        window.addEventListener('load', () => {
+            console.log('Zabbix RAG 시스템 로드 완료');
+        });
+    </script>
+</body>
+</html>

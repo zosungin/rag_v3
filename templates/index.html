@@ -1,0 +1,2868 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Zabbix RAG Dashboard</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            /* ── Grafana Dark theme palette ── */
+            --bg-primary:    #111217;
+            --bg-secondary:  #181b1f;
+            --bg-card:       #22252b;
+            --bg-card-hover: #2a2e36;
+            --bg-input:      #1c1f26;
+            --border:        rgba(255,255,255,0.08);
+            --border-focus:  rgba(255,152,48,0.55);
+            --text-soft:     #d8d9da;
+            --btn-dark:      #1a1d23;
+            --btn-dark-hover:#22252b;
+            --text-primary:  #d8d9da;
+            --text-secondary:#9fa7b3;
+            --text-muted:    #5a6272;
+            /* Grafana orange accent */
+            --accent:        #ff9830;
+            --accent-light:  #ffad57;
+            --accent-bg:     rgba(255,152,48,0.10);
+            /* Grafana semantic colors */
+            --success:       #73bf69;
+            --success-bg:    rgba(115,191,105,0.10);
+            --warning:       #f2cc0c;
+            --warning-bg:    rgba(242,204,12,0.10);
+            --danger:        #f2495c;
+            --danger-bg:     rgba(242,73,92,0.10);
+            --info:          #5794f2;
+            --info-bg:       rgba(87,148,242,0.10);
+            --mcp:           #b877d9;
+            --mcp-bg:        rgba(184,119,217,0.10);
+            --sidebar-width: 260px;
+            --radius:        8px;
+            --radius-lg:     12px;
+        }
+
+        /* ── Base reset + scrollbar ── */
+        * { margin:0; padding:0; box-sizing:border-box; }
+        html, body { height:100%; overflow:hidden; }
+        body {
+            font-family: 'DM Sans', -apple-system, BlinkMacSystemFont, sans-serif;
+            background: var(--bg-primary);
+            color: var(--text-primary);
+            line-height: 1.55;
+            font-size: 14px;
+            -webkit-font-smoothing: antialiased;
+        }
+        ::-webkit-scrollbar { width:6px; height:6px; }
+        ::-webkit-scrollbar-track { background:var(--bg-secondary); }
+        ::-webkit-scrollbar-thumb { background:#3a3f4a; border-radius:0; }
+        ::-webkit-scrollbar-thumb:hover { background:#4a5060; }
+        * { scrollbar-width:thin; scrollbar-color:#3a3f4a var(--bg-secondary); }
+
+        /* ── App layout ── */
+        .app-layout {
+            display: flex;
+            flex-direction: row;
+            height: 100vh;
+            overflow: hidden;
+        }
+
+        /* ── Sidebar ── */
+        .sidebar {
+            width: var(--sidebar-width);
+            flex-shrink: 0;
+            background: var(--bg-secondary);
+            border-right: 1px solid var(--border);
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+            height: 100%;
+        }
+        .sidebar-header {
+            flex-shrink: 0;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 14px 14px 12px;
+            border-bottom: 1px solid var(--border);
+        }
+        .sidebar-title {
+            font-size: 11px;
+            font-weight: 600;
+            color: var(--text-muted);
+            letter-spacing: 0.8px;
+            text-transform: uppercase;
+            white-space: nowrap;
+        }
+        .new-chat-btn {
+            background: transparent;
+            color: var(--accent);
+            border: 1px solid rgba(207,127,78,0.3);
+            border-radius: 8px;
+            padding: 5px 11px;
+            font-size: 12px;
+            cursor: pointer;
+            font-family: inherit;
+            font-weight: 500;
+            transition: all 0.18s ease;
+            white-space: nowrap;
+            flex-shrink: 0;
+        }
+        .new-chat-btn:hover {
+            background: var(--accent-bg);
+            border-color: var(--accent);
+            color: var(--accent-light);
+        }
+        .history-list { flex:1; overflow-y:auto; padding:8px 6px; }
+        .history-item {
+            padding: 8px 10px;
+            border-radius: var(--radius);
+            cursor: pointer;
+            margin-bottom: 2px;
+            transition: background 0.15s ease;
+            border: 1px solid transparent;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 6px;
+        }
+        .history-item:hover { background: var(--bg-card); }
+        .history-item.active {
+            background: var(--accent-bg);
+            border-color: rgba(207,127,78,0.25);
+        }
+        .history-item-title {
+            font-size: 13px;
+            color: var(--text-secondary);
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            font-weight: 400;
+            flex: 1;
+            min-width: 0;
+        }
+        .history-item.active .history-item-title { color: var(--accent-light); }
+        .history-item-meta { font-size:12px; color:var(--text-muted); display:flex; align-items:center; gap:4px; flex-shrink:0; white-space:nowrap; }
+        .history-item-delete { color:var(--text-muted); cursor:pointer; opacity:0; transition:opacity 0.15s; font-size:13px; padding:0 3px; }
+        .history-item:hover .history-item-delete { opacity:1; }
+        .history-item-delete:hover { color:var(--danger); }
+        .history-empty { text-align:center; padding:40px 16px; font-size:13px; color:var(--text-muted); line-height:1.6; }
+
+        /* ── Main content ── */
+        .main-content {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+            min-width: 0;
+            height: 100%;
+        }
+        .top-fixed {
+            flex-shrink: 0;
+            background: var(--bg-primary);
+            border-bottom: 1px solid var(--border);
+            padding: 0 20px;
+            z-index: 10;
+        }
+
+        /* ── Header ── */
+        .header {
+            padding: 14px 0 12px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+        .header-left { display:flex; align-items:center; gap:12px; }
+        .logo {
+            width: 34px;
+            height: 34px;
+            background: #22252b;
+            border: 1px solid rgba(255,152,48,0.4);
+            border-radius: 2px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 16px;
+            font-weight: 700;
+            color: var(--accent);
+            letter-spacing: -0.5px;
+        }
+        .header-title {
+            font-size: 16px;
+            font-weight: 600;
+            letter-spacing: -0.3px;
+            color: var(--text-primary);
+        }
+        .header-subtitle { font-size: 12px; color: var(--text-muted); margin-top: 1px; }
+        .status-badge {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            font-size: 12px;
+            color: var(--text-muted);
+            padding: 5px 12px;
+            background: var(--bg-card);
+            border-radius: 20px;
+            border: 1px solid var(--border);
+        }
+        .status-dot { width:6px; height:6px; border-radius:50%; background:var(--success); animation:pulse 2.5s ease infinite; }
+        @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.3} }
+
+        /* ── Search section ── */
+        .search-section { padding: 0 0 14px; }
+        .filter-row { display:flex; align-items:center; gap:5px; margin-top:10px; }
+        .filter-row-label { font-size:11px; color:var(--text-muted); margin-right:2px; letter-spacing:0.4px; font-weight:500; }
+        .search-bar {
+            display: flex;
+            align-items: center;
+            background: var(--bg-input);
+            border: 1px solid var(--border);
+            border-radius: var(--radius-lg);
+            padding: 4px 4px 4px 6px;
+            transition: border-color 0.2s ease, box-shadow 0.2s ease;
+        }
+        .search-bar:focus-within {
+            border-color: rgba(207,127,78,0.45);
+            box-shadow: 0 0 0 3px rgba(207,127,78,0.07);
+        }
+        .search-icon { padding:0 10px; color:var(--text-muted); font-size:13px; }
+        .search-input {
+            flex: 1;
+            background: transparent;
+            border: none;
+            outline: none;
+            color: var(--text-primary);
+            font-size: 15px;
+            padding: 9px 0;
+            font-family: inherit;
+            font-weight: 400;
+        }
+        .search-input::placeholder { color: var(--text-muted); }
+        .search-btn {
+            background: var(--accent);
+            color: #fff;
+            border: none;
+            border-radius: 10px;
+            padding: 9px 18px;
+            font-size: 13px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: background 0.18s ease, transform 0.1s ease;
+            font-family: inherit;
+            letter-spacing: 0.1px;
+        }
+        .search-btn:hover:not(:disabled) { background: var(--accent-light); }
+        .search-btn:active:not(:disabled) { transform: scale(0.97); }
+        .search-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+        .filter-chip {
+            padding: 4px 11px;
+            border-radius: 20px;
+            font-size: 12px;
+            border: 1px solid var(--border);
+            background: transparent;
+            color: var(--text-muted);
+            cursor: pointer;
+            transition: all 0.15s ease;
+            font-family: inherit;
+            font-weight: 400;
+        }
+        .filter-chip:hover { background: var(--bg-card); color: var(--text-secondary); border-color: rgba(255,255,255,0.12); }
+        .filter-chip.active { background: var(--accent-bg); border-color: rgba(207,127,78,0.35); color: var(--accent-light); font-weight: 500; }
+        .divider { width:1px; height:14px; background:var(--border); }
+
+        /* ── Content area ── */
+        .content-area {
+            flex: 1;
+            display: grid;
+            grid-template-columns: 1fr 340px;
+            gap: 0;
+            min-height: 0;
+            overflow: hidden;
+        }
+        .answer-panel {
+            overflow-y: auto;
+            padding: 24px 24px 40px;
+            min-height: 0;
+        }
+        .chat-message { margin-bottom:28px; padding-bottom:24px; border-bottom:1px solid var(--border); }
+        .chat-message:last-child { border-bottom:none; }
+        .chat-query { display:flex; align-items:center; gap:10px; margin-bottom:14px; flex-wrap:nowrap; overflow:hidden; min-height:32px; }
+        .chat-query-icon { width:28px; height:28px; background:var(--accent-bg); border:1px solid rgba(255,152,48,0.25); border-radius:2px; display:flex; align-items:center; justify-content:center; font-size:11px; font-weight:700; flex-shrink:0; color:var(--accent); align-self:center; }
+        .chat-query-text { font-size:15px; font-weight:500; color:var(--text-primary); flex:1; min-width:0; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; align-self:center; }
+        .chat-query-chips { display:flex; flex-direction:row; flex-wrap:nowrap; gap:5px; flex-shrink:0; align-items:center; align-self:center; }
+        /* badge styles */
+        .qbadge { display:inline-flex; align-items:center; justify-content:center; gap:4px; padding:2px 8px; border-radius:20px; font-size:11px; font-weight:500; border:1px solid; white-space:nowrap; transition:background 0.15s; cursor:default; line-height:1.4; background:transparent; vertical-align:middle; height:22px; }
+        .qbadge-type     { border-color:rgba(255,255,255,0.12); color:var(--text-muted); }
+        .qbadge-type:hover  { background:rgba(255,255,255,0.05); }
+        .qbadge-analysis { border-color:rgba(251,191,36,0.3); color:#d4a832; }
+        .qbadge-analysis:hover { background:rgba(251,191,36,0.08); }
+        .qbadge-alert    { border-color:rgba(248,113,113,0.28); color:#d97070; }
+        .qbadge-alert:hover { background:rgba(248,113,113,0.08); }
+        .qbadge-status   { border-color:rgba(125,211,252,0.28); color:#5ea8d6; }
+        .qbadge-status:hover { background:rgba(125,211,252,0.08); }
+        .qbadge-list     { border-color:rgba(207,127,78,0.28); color:var(--accent); }
+        .qbadge-list:hover { background:rgba(207,127,78,0.08); }
+        .qbadge-rag      { border-color:rgba(74,222,128,0.25); color:#3daa6a; }
+        .qbadge-rag:hover { background:rgba(74,222,128,0.08); }
+        .qbadge-mcp      { border-color:rgba(196,181,253,0.25); color:#9d87e0; }
+        .qbadge-mcp:hover { background:rgba(196,181,253,0.08); }
+        .qbadge-hybrid   { border-color:rgba(251,191,36,0.25); color:#b8962e; }
+        .qbadge-hybrid:hover { background:rgba(251,191,36,0.08); }
+        .qbadge-model    { border-color:rgba(207,127,78,0.22); color:var(--accent); }
+        .qbadge-model:hover { background:rgba(207,127,78,0.08); }
+        .empty-state { display:flex; flex-direction:column; align-items:center; justify-content:center; height:100%; min-height:400px; text-align:center; color:var(--text-muted); }
+        .empty-state-icon { font-size:40px; margin-bottom:16px; opacity:0.25; }
+        .empty-state h3 { font-size:15px; font-weight:500; color:var(--text-secondary); margin-bottom:8px; }
+        .empty-state p { font-size:13px; color:var(--text-muted); max-width:280px; line-height:1.6; }
+        .loading-state { display:flex; flex-direction:column; align-items:center; justify-content:center; min-height:200px; gap:14px; }
+        .loading-spinner { width:28px; height:28px; border:2px solid var(--border); border-top-color:var(--accent); border-radius:50%; animation:spin 0.75s linear infinite; }
+        @keyframes spin { to{transform:rotate(360deg)} }
+        .loading-text { font-size:13px; color:var(--text-muted); }
+        .query-type-badge { display:inline-flex; align-items:center; gap:5px; padding:3px 10px; border-radius:20px; font-size:12px; font-weight:500; margin-bottom:8px; margin-right:6px; border:1px solid; }
+        .badge-status   { background:rgba(125,211,252,0.06);  border-color:rgba(125,211,252,0.25);  color:#5ea8d6; }
+        .badge-list     { background:rgba(207,127,78,0.07);   border-color:rgba(207,127,78,0.28);   color:var(--accent); }
+        .badge-alert    { background:rgba(248,113,113,0.06);  border-color:rgba(248,113,113,0.25);  color:#d97070; }
+        .badge-analysis { background:rgba(251,191,36,0.07);   border-color:rgba(251,191,36,0.30);   color:#d4a832; }
+        .badge-general  { background:rgba(255,255,255,0.03);  border-color:rgba(255,255,255,0.10);  color:var(--text-muted); }
+        .badge-log      { background:rgba(196,181,253,0.06);  border-color:rgba(196,181,253,0.25);  color:#9d87e0; }
+        .badge-inventory{ background:rgba(74,222,128,0.06);   border-color:rgba(74,222,128,0.24);   color:#3daa6a; }
+        .badge-process  { background:rgba(251,146,60,0.06);   border-color:rgba(251,146,60,0.24);   color:#d47e40; }
+        .data-source-badge { display:inline-flex; align-items:center; gap:4px; padding:3px 10px; border-radius:20px; font-size:12px; font-weight:500; margin-bottom:16px; border:1px solid; }
+        .badge-mcp    { background:rgba(196,181,253,0.06); border-color:rgba(196,181,253,0.24); color:#9d87e0; }
+        .badge-rag    { background:rgba(74,222,128,0.06);  border-color:rgba(74,222,128,0.24);  color:#3daa6a; }
+        .badge-hybrid { background:rgba(251,191,36,0.06);  border-color:rgba(251,191,36,0.24);  color:#b8962e; }
+        .answer-title { font-size:15px; font-weight:600; margin-bottom:14px; letter-spacing:-0.2px; color:var(--text-primary); }
+        .host-info-bar { display:flex; gap:16px; padding:12px 16px; background:var(--bg-card); border-radius:var(--radius); border:1px solid var(--border); margin-bottom:16px; flex-wrap:wrap; }
+        .host-info-item { display:flex; align-items:center; gap:6px; font-size:12px; }
+        .host-info-label { color:var(--text-muted); }
+        .host-info-value { color:var(--text-primary); font-weight:500; }
+        .metrics-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(200px,240px)); gap:10px; margin-bottom:20px; }
+        .metric-card { background:var(--bg-card); border:1px solid var(--border); border-radius:var(--radius); padding:14px 16px; transition:border-color 0.2s ease; }
+        .metric-card:hover { border-color:rgba(255,255,255,0.14); }
+        .metric-card-label { font-size:13px; color:var(--text-secondary); margin-bottom:8px; letter-spacing:0.2px; font-weight:500; text-transform:uppercase; }
+        .metric-card-value { font-size:22px; font-weight:600; letter-spacing:-0.5px; overflow-wrap:break-word; word-break:break-word; line-height:1.1; }
+        .metric-card-unit { font-size:14px; color:var(--text-secondary); margin-left:3px; font-weight:400; }
+        .metric-card.status-normal { border-left:2px solid var(--success); }
+        .metric-card.status-normal .metric-card-value { color:var(--success); }
+        .metric-card.status-warning { border-left:2px solid var(--warning); }
+        .metric-card.status-warning .metric-card-value { color:var(--warning); }
+        .metric-card.status-critical { border-left:2px solid var(--danger); }
+        .metric-card.status-critical .metric-card-value { color:var(--danger); }
+        /* 테이블 */
+        .data-table-wrap { overflow-x:auto; margin-bottom:20px; -webkit-overflow-scrolling:touch; }
+        .data-table { width:100%; border-collapse:collapse; font-size:13px; min-width:400px; }
+        .data-table th { text-align:left; padding:9px 13px; background:var(--bg-card); color:var(--text-muted); font-weight:600; font-size:11px; text-transform:uppercase; letter-spacing:0.5px; border-bottom:1px solid var(--border); white-space:nowrap; line-height:1.5; }
+        .data-table td { padding:9px 13px; border-bottom:1px solid var(--border); color:var(--text-primary); font-size:13px; line-height:1.6; vertical-align:middle; }
+        .data-table tr:hover td { background:var(--bg-card); }
+        .data-table .rank-cell { color:var(--text-muted); font-weight:500; width:auto; white-space:nowrap; padding-right:12px; font-size:12px; }
+        /* 로그 내용 셀 — 긴 로그가 박스 내에서 줄바꿈되도록 처리 */
+        .data-table td.log-cell { white-space:pre-wrap; word-break:break-all; font-family:monospace; font-size:12px; line-height:1.5; max-width:600px; }
+        .kv-table { min-width:unset; }
+        .kv-table thead { display:none; }
+        .kv-table td:first-child { font-weight:600; background:var(--bg-card); color:var(--text-muted); width:180px; white-space:nowrap; }
+        /* kv-table 내용(오른쪽) 셀도 긴 텍스트 줄바꿈 */
+        .kv-table td:last-child { color:var(--text-primary); word-break:break-word; white-space:pre-wrap; }
+        .kv-table .rank-cell { display:none; width:0; padding:0; border:none; }
+        /* pagination */
+        .page-btn { background:var(--bg-card); border:1px solid var(--border); border-radius:6px; color:var(--text-primary); padding:4px 10px; font-size:12px; cursor:pointer; transition:background 0.15s; }
+        .page-btn:hover:not([disabled]) { background:var(--bg-card-hover); border-color:var(--accent); }
+        .page-btn[disabled] { opacity:0.3; cursor:default; }
+        .page-btn-active { background:var(--accent) !important; color:#fff !important; border-color:var(--accent) !important; font-weight:600; }
+        /* clarify UI */
+        .clarify-box { background:var(--bg-card); border:1px solid rgba(207,127,78,0.3); border-radius:var(--radius); padding:16px 18px; margin-bottom:12px; }
+        .clarify-icon { font-size:20px; margin-bottom:8px; }
+        .clarify-question { font-size:14px; color:var(--text-primary); font-weight:500; line-height:1.65; margin-bottom:12px; white-space:pre-line; }
+        .clarify-buttons { display:flex; flex-wrap:wrap; gap:7px; }
+        .clarify-btn { background:var(--bg-secondary); border:1px solid var(--border); border-radius:20px; color:var(--text-primary); padding:5px 13px; font-size:12px; cursor:pointer; transition:all 0.15s; }
+        .clarify-btn:hover { background:var(--accent); color:#fff; border-color:var(--accent); }
+        .clarify-selected { font-size:12px; color:var(--accent); font-weight:600; margin-left:6px; }
+        .clarify-input-row { display:flex; gap:8px; margin-top:12px; align-items:center; }
+        .clarify-input { flex:1; padding:7px 12px; border:1px solid var(--border); border-radius:8px; background:var(--bg-secondary); color:var(--text-primary); font-size:14px; outline:none; font-family:inherit; }
+        .clarify-input:focus { border-color:var(--accent); }
+        .clarify-send-btn { background:var(--accent); border:none; border-radius:8px; color:#fff; padding:7px 14px; font-size:12px; cursor:pointer; white-space:nowrap; transition:opacity 0.15s; }
+        .clarify-send-btn:hover { opacity:0.85; }
+        /* source time */
+        .source-time { font-size:11px; color:var(--text-muted); margin-top:5px; }
+        .stability-tag { padding:2px 8px; border-radius:20px; font-size:11px; font-weight:500; }
+        .stability-stable { background:var(--success-bg); color:var(--success); }
+        .stability-variable { background:var(--warning-bg); color:var(--warning); }
+        .stability-unstable { background:var(--danger-bg); color:var(--danger); }
+        .alert-summary-bar { display:flex; gap:12px; margin-bottom:16px; }
+        .alert-counter { display:flex; align-items:center; gap:8px; padding:10px 14px; background:var(--bg-card); border-radius:var(--radius); border:1px solid var(--border); flex:1; }
+        .alert-counter-value { font-size:22px; font-weight:600; }
+        .alert-counter-label { font-size:11px; color:var(--text-muted); text-transform:uppercase; letter-spacing:0.3px; }
+        .alert-counter.total .alert-counter-value { color:var(--text-primary); }
+        .alert-counter.active .alert-counter-value { color:var(--danger); }
+        .alert-counter.resolved .alert-counter-value { color:var(--success); }
+        .timeline { position:relative; padding-left:22px; }
+        .timeline::before { content:''; position:absolute; left:7px; top:0; bottom:0; width:1px; background:var(--border); }
+        .timeline-item { position:relative; padding:11px 14px; background:var(--bg-card); border:1px solid var(--border); border-radius:var(--radius); margin-bottom:10px; }
+        .timeline-item:hover { border-color:rgba(255,255,255,0.12); }
+        .timeline-item::before { content:''; position:absolute; left:-18px; top:17px; width:8px; height:8px; border-radius:50%; border:2px solid var(--bg-primary); }
+        .timeline-item.severity-5::before { background:#dc2626; }
+        .timeline-item.severity-4::before { background:#f87171; }
+        .timeline-item.severity-3::before { background:#fb923c; }
+        .timeline-item.severity-2::before { background:#fbbf24; }
+        .timeline-item.severity-1::before { background:#7dd3fc; }
+        .timeline-header { display:flex; align-items:center; gap:8px; margin-bottom:5px; flex-wrap:wrap; }
+        .timeline-time { font-size:13px; color:var(--text-secondary); font-weight:500; }
+        .severity-tag { padding:2px 8px; border-radius:20px; font-size:11px; font-weight:500; }
+        .severity-disaster { background:rgba(220,38,38,0.14); color:#dc2626; }
+        .severity-high { background:var(--danger-bg); color:var(--danger); }
+        .severity-average { background:rgba(251,146,60,0.13); color:#fb923c; }
+        .severity-warning { background:var(--warning-bg); color:var(--warning); }
+        .severity-information { background:var(--info-bg); color:var(--info); }
+        .alert-status-tag { padding:2px 8px; border-radius:20px; font-size:11px; font-weight:500; margin-left:auto; }
+        .sev-badge { display:inline-block; padding:1px 7px; border-radius:20px; font-size:11px; font-weight:600; margin-left:6px; vertical-align:middle; }
+        .sev-disaster { background:rgba(220,38,38,0.16); color:#ef4444; border:1px solid rgba(220,38,38,0.35); }
+        .sev-high { background:rgba(239,68,68,0.13); color:#f87171; border:1px solid rgba(239,68,68,0.28); }
+        .sev-average { background:rgba(251,146,60,0.13); color:#fb923c; border:1px solid rgba(251,146,60,0.28); }
+        .sev-warning { background:rgba(251,191,36,0.12); color:#fbbf24; border:1px solid rgba(251,191,36,0.28); }
+        .sev-info { background:rgba(125,211,252,0.12); color:#7dd3fc; border:1px solid rgba(125,211,252,0.28); }
+        .sev-ok { background:rgba(74,222,128,0.12); color:#4ade80; border:1px solid rgba(74,222,128,0.28); }
+        .response-meta-bar { display:flex; align-items:center; gap:10px; padding:6px 14px; background:var(--bg-secondary); border-radius:var(--radius); border:1px solid var(--border); margin-bottom:12px; font-size:11px; flex-wrap:wrap; }
+        .meta-chip { display:inline-flex; align-items:center; gap:4px; padding:2px 8px; border-radius:20px; background:var(--bg-card); border:1px solid var(--border); color:var(--text-secondary); }
+        .meta-chip-icon { font-size:10px; }
+        .conf-high { color:var(--success); }
+        .conf-medium { color:var(--warning); }
+        .conf-low { color:var(--danger); }
+        .progress-step { color:var(--accent); font-size:13px; }
+        .suggested-queries { display:flex; flex-wrap:wrap; gap:7px; margin-top:14px; padding-top:12px; border-top:1px solid var(--border); }
+        .suggested-label { font-size:10px; color:var(--text-muted); font-weight:600; letter-spacing:0.6px; width:100%; margin-bottom:2px; text-transform:uppercase; }
+        .suggested-btn { display:inline-flex; align-items:center; gap:5px; padding:5px 12px; background:var(--bg-secondary); border:1px solid var(--border); border-radius:20px; font-size:12px; color:var(--text-secondary); cursor:pointer; transition:all 0.15s; }
+        .suggested-btn:hover { background:var(--accent-bg); color:var(--accent-light); border-color:rgba(207,127,78,0.3); }
+        .suggested-btn::before { content:'↪'; font-size:11px; opacity:0.6; }
+        .alert-active { background:var(--danger-bg); color:var(--danger); }
+        .alert-resolved { background:var(--success-bg); color:var(--success); }
+        .timeline-body { font-size:14px; }
+        .timeline-host { font-weight:500; color:var(--text-primary); }
+        .timeline-alert-name { color:var(--text-primary); font-size:14px; font-weight:500; margin-top:2px; display:block; word-break:break-word; white-space:pre-wrap; }
+        .timeline-alert-sub { color:var(--text-secondary); font-size:13px; font-weight:400; word-break:break-word; }
+        .analysis-box { padding:14px 16px; background:var(--bg-card); border-radius:var(--radius); border:1px solid var(--border); margin-bottom:14px; }
+        .analysis-box-label { font-size:10px; color:var(--text-muted); text-transform:uppercase; letter-spacing:0.6px; margin-bottom:8px; font-weight:700; }
+        .analysis-box-text { font-size:14px; color:var(--text-primary); line-height:1.7; }
+        .analysis-box-text p { margin:0 0 4px 0; }
+        .analysis-box-text p:last-child { margin-bottom:0; }
+        .num-hi { color:var(--accent-light); font-weight:600; letter-spacing:0.1px; }
+        .general-answer { font-size:14px; line-height:1.8; color:var(--text-primary); padding:16px; background:var(--bg-card); border-radius:var(--radius); border:1px solid var(--border); }
+        .general-note { font-size:13px; color:var(--text-muted); margin-top:12px; padding:8px 12px; background:var(--bg-secondary); border-radius:var(--radius); border-left:2px solid var(--border); }
+        .measured-at { font-size:12px; color:var(--text-muted); margin-top:14px; display:flex; align-items:center; gap:6px; }
+        .time-filter-badge { display:inline-flex; align-items:center; gap:4px; padding:3px 10px; border-radius:20px; font-size:11px; background:var(--accent-bg); color:var(--accent-light); margin-bottom:12px; }
+        /* ══ SIDEBAR — new structure ══ */
+        .sidebar {
+            width: var(--sidebar-width);
+            flex-shrink: 0;
+            background: var(--bg-secondary);
+            border-right: 1px solid var(--border);
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+            height: 100%;
+        }
+        .sidebar-header {
+            flex-shrink: 0;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding: 16px 14px 14px;
+            border-bottom: 1px solid var(--border);
+        }
+        .sidebar-title { font-size:14px; font-weight:600; color:var(--text-primary); letter-spacing:-0.2px; }
+        .new-session-wrap { padding:10px 12px 6px; flex-shrink:0; }
+        .new-chat-btn {
+            width: 100%;
+            background: var(--bg-card);
+            color: var(--text-secondary);
+            border: 1px solid var(--border);
+            border-radius: var(--radius);
+            padding: 8px 12px;
+            font-size: 13px;
+            cursor: pointer;
+            font-family: inherit;
+            font-weight: 500;
+            transition: all 0.18s ease;
+            text-align: center;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 6px;
+        }
+        .new-chat-btn:hover { background: var(--accent-bg); border-color: rgba(207,127,78,0.3); color: var(--accent-light); }
+        .history-section {
+            flex: 0 0 auto;
+            display: flex;
+            flex-direction: column;
+            min-height: 0;
+        }
+        .history-section.history-expanded {
+            flex: 1;
+        }
+        .history-section-head {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 12px 14px 6px;
+            flex-shrink: 0;
+        }
+        .history-section-head .history-label { padding: 0; margin: 0; }
+        .history-toggle-btn {
+            background: transparent;
+            border: 1px solid var(--border);
+            color: var(--text-muted);
+            width: 28px;
+            height: 28px;
+            border-radius: var(--radius);
+            cursor: pointer;
+            font-size: 12px;
+            line-height: 1;
+            flex-shrink: 0;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-family: inherit;
+        }
+        .history-toggle-btn:hover { color: var(--accent-light); border-color: rgba(255,152,48,0.35); }
+        .history-list-wrap {
+            flex: 1;
+            min-height: 0;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+        .history-list-wrap.is-collapsed { display: none !important; }
+        .history-label { font-size:10px; font-weight:700; color:var(--text-muted); letter-spacing:0.8px; text-transform:uppercase; flex-shrink:0; }
+        .history-list { flex:1; overflow-y:auto; padding:4px 8px; }
+        .history-item { padding:8px 10px; border-radius:var(--radius); cursor:pointer; margin-bottom:2px; transition:background 0.15s; border:1px solid transparent; display:flex; align-items:center; gap:8px; }
+        .history-item:hover { background:var(--bg-card); }
+        .history-item.active { background:var(--accent-bg); border-color:rgba(207,127,78,0.2); }
+        .history-item-icon { width:16px; height:16px; flex-shrink:0; opacity:0.4; display:flex; align-items:center; justify-content:center; font-size:12px; }
+        .history-item.active .history-item-icon { opacity:0.8; color:var(--accent); }
+        .history-item-title { font-size:13px; color:var(--text-secondary); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; font-weight:400; flex:1; min-width:0; }
+        .history-item.active .history-item-title { color:var(--text-primary); }
+        .history-item-meta { font-size:11px; color:var(--text-muted); display:flex; align-items:center; gap:4px; flex-shrink:0; }
+        .history-item-delete { color:var(--text-muted); cursor:pointer; opacity:0; transition:opacity 0.15s; font-size:12px; padding:0 2px; }
+        .history-item:hover .history-item-delete { opacity:1; }
+        .history-item-delete:hover { color:var(--danger); }
+        .history-empty { text-align:center; padding:32px 12px; font-size:12px; color:var(--text-muted); line-height:1.6; }
+        /* Sidebar footer — model select */
+        .sidebar-footer {
+            flex-shrink: 0;
+            border-top: 1px solid var(--border);
+            padding: 12px 14px;
+            background: var(--bg-secondary);
+        }
+        .sidebar-footer-label { font-size:10px; font-weight:700; color:var(--text-muted); text-transform:uppercase; letter-spacing:0.7px; margin-bottom:8px; }
+        .model-select-row { display:flex; align-items:center; gap:8px; width:100%; }
+        .model-select-wrap { flex:1; min-width:0; }
+        .model-select-wrap select { width:100%; padding:7px 28px 7px 10px; font-size:12px; font-family:inherit; background:var(--bg-card); color:var(--text-primary); border:1px solid var(--border); border-radius:var(--radius); cursor:pointer; outline:none; appearance:none; -webkit-appearance:none; background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='10' fill='%236b6560' viewBox='0 0 16 16'%3E%3Cpath d='M8 11L3 6h10z'/%3E%3C/svg%3E"); background-repeat:no-repeat; background-position:right 8px center; transition:border-color 0.2s; }
+        .model-select-wrap select:hover,.model-select-wrap select:focus { border-color:rgba(207,127,78,0.4); }
+        .model-select-badge { display:inline-block; flex-shrink:0; font-size:10px; font-weight:600; padding:2px 7px; border-radius:20px; align-self:center; }
+        .model-select-badge.msb-ollama { background:rgba(196,181,253,0.15); color:#c4b5fd; }
+        .model-select-badge.msb-gemini { background:rgba(74,222,128,0.12); color:#6ee7b7; }
+        .model-select-badge.msb-groq { background:rgba(251,146,60,0.15); color:#fdba74; }
+        .model-select-badge.msb-openai { background:rgba(74,222,128,0.12); color:#6ee7b7; }
+        /* hide old selectors that no longer exist */
+        .model-select-section { display:none; }
+        .top-fixed { display:none; }
+
+        /* ══ MAIN CONTENT — 3-row flex ══ */
+        .main-content {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+            min-width: 0;
+            height: 100%;
+        }
+
+        /* ── TOP NAV (tabs) ── */
+        .top-nav {
+            flex-shrink: 0;
+            display: flex;
+            align-items: center;
+            border-bottom: 1px solid var(--border);
+            background: var(--bg-primary);
+            padding: 0 20px;
+            height: 46px;
+            gap: 0;
+        }
+        .nav-tabs { display:flex; align-items:stretch; gap:0; height:100%; }
+        .nav-tab {
+            display: flex; align-items: center; gap:7px;
+            padding: 0 18px;
+            font-size: 13px; font-weight: 500;
+            color: var(--text-muted);
+            background: transparent;
+            border: none; border-bottom: 2px solid transparent;
+            cursor: pointer; font-family: inherit;
+            transition: color 0.15s, border-color 0.15s;
+            white-space: nowrap;
+            height: 100%;
+            margin-bottom: -1px;
+        }
+        .nav-tab:hover { color: var(--text-secondary); }
+        .nav-tab.active { color: var(--text-primary); border-bottom-color: var(--accent); font-weight: 600; }
+        .nav-tab-icon { font-size:12px; opacity:0.7; }
+        .nav-separator { width:1px; height:20px; background:var(--border); margin:0 4px; }
+        .nav-spacer { flex:1; }
+        .nav-filter-row { display:flex; align-items:center; gap:5px; }
+        .filter-row-label { font-size:11px; color:var(--text-muted); margin-right:2px; letter-spacing:0.4px; font-weight:500; }
+        .filter-chip { padding:3px 10px; border-radius:20px; font-size:11px; border:1px solid var(--border); background:transparent; color:var(--text-muted); cursor:pointer; transition:all 0.15s ease; font-family:inherit; }
+        .filter-chip:hover { background:var(--bg-card); color:var(--text-secondary); }
+        .filter-chip.active { background:var(--accent-bg); border-color:rgba(207,127,78,0.35); color:var(--accent-light); font-weight:500; }
+        .status-badge { display:flex; align-items:center; gap:6px; font-size:11px; color:var(--text-muted); padding:4px 10px; background:var(--bg-card); border-radius:20px; border:1px solid var(--border); margin-left:12px; }
+        .status-dot { width:6px; height:6px; border-radius:50%; background:var(--success); animation:pulse 2.5s ease infinite; }
+        @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.3} }
+
+        /* ── CONTENT AREA: answer + intel panel ── */
+        .content-area {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            gap: 0;
+            min-height: 0;
+            overflow: hidden;
+        }
+        .answer-panel {
+            flex: 1;
+            overflow-y: auto;
+            padding: 24px 28px 16px;
+            min-height: 0;
+        }
+
+        /* ── INTELLIGENCE INSPECTOR (right panel) ── */
+        .sources-panel {
+            border-left: 1px solid var(--border);
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+            min-height: 0;
+            background: var(--bg-secondary);
+        }
+        /* 요청: 우측 패널 전체 제거 */
+        .sources-panel { display: none !important; }
+        .intel-header {
+            flex-shrink: 0;
+            padding: 14px 16px 12px;
+            border-bottom: 1px solid var(--border);
+            font-size: 11px;
+            font-weight: 700;
+            color: var(--text-muted);
+            letter-spacing: 0.8px;
+            text-transform: uppercase;
+        }
+        .intel-body { flex:1; overflow-y:auto; padding:0; }
+        .intel-section { border-bottom:1px solid var(--border); padding:14px 16px; }
+        .intel-section:last-child { border-bottom:none; }
+        .intel-section-title {
+            font-size: 10px;
+            font-weight: 700;
+            color: var(--text-muted);
+            text-transform: uppercase;
+            letter-spacing: 0.7px;
+            margin-bottom: 10px;
+        }
+        /* source / mcp cards inside intel panel */
+        .source-card { padding:10px 11px; background:var(--bg-card); border:1px solid var(--border); border-radius:var(--radius); margin-bottom:7px; overflow:hidden; transition:border-color 0.15s; font-size:13px; }
+        .source-card:hover { border-color:rgba(255,255,255,0.12); }
+        .source-data-tables { margin-top:0; padding-top:0; border-top:none; }
+        .source-ds { font-size:13px; line-height:1.45; margin-bottom:6px; }
+        .source-ds:last-of-type { margin-bottom: 0; }
+        .source-ds-label { color:var(--text-muted); font-weight:700; margin-right:6px; font-size:12px; letter-spacing:0.2px; }
+        .source-ds-val { font-family:ui-monospace,monospace; font-size:13px; color:var(--text-secondary); word-break:break-word; }
+        .source-ds-note { font-size:12px; color:var(--text-muted); margin-top:6px; line-height:1.4; }
+        .source-panel { margin-bottom: 0; }
+        /* 사이드바 참조 소스: 높이 제한 + 스크롤 (테이블 많을 때 패널 전체가 비대해지지 않음) */
+        .sources-list-scroll-wrap {
+            max-height: min(220px, 38vh);
+            overflow-y: auto;
+            overflow-x: hidden;
+            padding-right: 6px;
+            margin-bottom: 4px;
+            box-sizing: border-box;
+            scrollbar-width: thin;
+        }
+        .sources-list-scroll-wrap::-webkit-scrollbar { width: 6px; }
+        .sources-list-scroll-wrap::-webkit-scrollbar-thumb {
+            background: rgba(255,255,255,0.12);
+            border-radius: 4px;
+        }
+        .source-ds-summary {
+            font-size: 11px;
+            color: var(--text-muted);
+            margin-bottom: 8px;
+            line-height: 1.35;
+        }
+        .source-time { font-size:13px; color:var(--text-muted); margin-top:8px; padding-top:6px; border-top:1px solid var(--border); }
+        .mcp-query-card { padding:10px 11px; background:var(--bg-card); border:1px solid rgba(196,181,253,0.2); border-radius:var(--radius); margin-bottom:7px; font-size:12px; }
+        .mcp-query-card .mcp-tool { color:var(--mcp); font-weight:600; margin-bottom:4px; font-size:11px; display:flex; align-items:center; justify-content:space-between; }
+        .mcp-tool-status { font-size:10px; padding:1px 7px; border-radius:20px; background:var(--success-bg); color:var(--success); font-weight:600; }
+        .mcp-query-card .mcp-sql { color:var(--text-muted); font-family:'DM Mono','Courier New',monospace; font-size:11px; overflow-wrap:break-word; word-break:break-word; line-height:1.6; background:var(--bg-primary); padding:6px 8px; border-radius:6px; margin-top:4px; }
+        .mcp-query-card .mcp-count { color:var(--success); font-size:11px; margin-top:5px; font-weight:500; }
+        /* sources-title legacy alias */
+        .sources-title { font-size:10px; font-weight:700; color:var(--text-muted); text-transform:uppercase; letter-spacing:0.7px; margin-bottom:10px; }
+        .stats-section { margin-top:12px; padding-top:10px; border-top:1px solid var(--border); }
+        .stats-grid { display:grid; grid-template-columns:1fr 1fr; gap:6px; }
+        .stat-item { padding:7px 10px; background:var(--bg-card); border-radius:var(--radius); border:1px solid var(--border); text-align:center; }
+        .stat-value { font-size:15px; font-weight:700; color:var(--text-primary); }
+        .stat-label { font-size:10px; color:var(--text-muted); text-transform:uppercase; letter-spacing:0.4px; }
+        /* Health status rows */
+        .health-row { display:flex; align-items:center; justify-content:space-between; padding:5px 0; border-bottom:1px solid var(--border); font-size:12px; }
+        .health-row:last-child { border-bottom:none; }
+        .health-label { color:var(--text-secondary); }
+        .health-ok      { color:var(--success);  font-weight:600; font-size:11px; }
+        .health-warn    { color:var(--warning);  font-weight:600; font-size:11px; }
+        .health-err     { color:var(--danger);   font-weight:600; font-size:11px; }
+        .health-checking{ color:var(--text-muted); font-size:11px; animation:hpulse 1.2s ease infinite; }
+        @keyframes hpulse { 0%,100%{opacity:1} 50%{opacity:0.3} }
+
+        /* ── BOTTOM INPUT ── */
+        .bottom-input {
+            flex-shrink: 0;
+            border-top: 1px solid var(--border);
+            padding: 12px 20px 10px;
+            background: var(--bg-primary);
+        }
+        .search-bar {
+            display: flex;
+            align-items: center;
+            background: var(--bg-input);
+            border: 1px solid var(--border);
+            border-radius: var(--radius-lg);
+            padding: 4px 14px;
+            transition: border-color 0.2s ease, box-shadow 0.2s ease;
+        }
+        .search-bar:focus-within { border-color:rgba(207,127,78,0.45); box-shadow:0 0 0 3px rgba(207,127,78,0.07); }
+        .search-input { flex:1; background:transparent; border:none; outline:none; color:var(--text-primary); font-size:14px; padding:10px 0; font-family:inherit; }
+        .search-input::placeholder { color:var(--text-muted); }
+
+        /* ── Report tab (통합 운영 레포트) ── */
+        /* Analysis: 대화 이력만. Report 탭: 리포트 목록만(상단 전체) */
+        .chat-sidebar-block { display:flex; flex-direction:column; flex:1; min-height:120px; overflow:hidden; }
+        .report-sidebar-block { display:none; }
+        .sidebar.sidebar-mode-report .chat-sidebar-block { display:none !important; }
+        .sidebar.sidebar-mode-report .report-sidebar-block {
+            display:flex; flex-direction:column; flex:1; min-height:0; max-height:none;
+            overflow:hidden; border-top:none; margin-top:0; padding-top:0;
+        }
+        .report-panel-wrap { display:none; flex:1; flex-direction:column; min-height:0; overflow:hidden; width:100%; }
+        .report-panel-wrap.visible { display:flex; }
+        .report-panel-inner { flex:1; overflow-y:auto; padding:20px 24px 24px; }
+        .report-toolbar { display:flex; flex-wrap:wrap; align-items:center; gap:10px; margin-bottom:18px; padding-bottom:14px; border-bottom:1px solid var(--border); }
+        .report-toolbar label { font-size:12px; color:var(--text-muted); }
+        .report-toolbar input[type="datetime-local"] {
+            background:var(--bg-input); border:1px solid var(--border); color:var(--text-primary);
+            border-radius:6px; padding:6px 10px; font-family:inherit; font-size:13px;
+        }
+        .report-btn {
+            background:var(--accent-bg); border:1px solid rgba(207,127,78,0.35); color:var(--accent-light);
+            border-radius:8px; padding:7px 14px; font-size:13px; cursor:pointer; font-family:inherit; font-weight:500;
+        }
+        .report-btn:hover { border-color:var(--accent); }
+        .report-btn-secondary { background:transparent; color:var(--text-secondary); border-color:var(--border); }
+        .report-kpi-grid {
+            display:grid; grid-template-columns:repeat(auto-fill, minmax(140px, 1fr)); gap:12px; margin-bottom:20px;
+        }
+        .report-kpi-card {
+            background:var(--bg-card); border:1px solid var(--border); border-radius:var(--radius); padding:14px 16px;
+        }
+        .report-kpi-val { font-size:22px; font-weight:700; color:var(--accent-light); }
+        .report-kpi-lbl { font-size:11px; color:var(--text-muted); text-transform:uppercase; letter-spacing:0.5px; margin-top:4px; }
+        .report-charts-row { display:grid; grid-template-columns:repeat(auto-fit, minmax(260px, 1fr)); gap:16px; margin-bottom:20px; }
+        .report-chart-card {
+            background:var(--bg-card); border:1px solid var(--border); border-radius:var(--radius); padding:14px; min-height:260px;
+        }
+        .report-chart-title { font-size:11px; font-weight:700; color:var(--text-muted); text-transform:uppercase; letter-spacing:0.6px; margin-bottom:10px; }
+        .report-chart-card canvas { max-height:220px; }
+        .report-table-wrap { overflow-x:auto; border:1px solid var(--border); border-radius:var(--radius); margin-bottom:16px; }
+        .report-table { width:100%; border-collapse:collapse; font-size:13px; }
+        .report-table th, .report-table td { padding:8px 12px; text-align:left; border-bottom:1px solid var(--border); }
+        .report-table th { background:var(--bg-secondary); color:var(--text-muted); font-size:11px; font-weight:600; }
+        .report-warnings { background:rgba(242,204,12,0.08); border:1px solid rgba(242,204,12,0.25); border-radius:var(--radius); padding:10px 14px; margin-bottom:16px; font-size:13px; color:var(--warning); }
+        .report-warnings ul { margin:6px 0 0 18px; }
+        .report-exec-summary {
+            background:var(--bg-card); border:1px solid var(--border); border-radius:var(--radius);
+            padding:14px 16px; margin-bottom:18px; font-size:14px; line-height:1.65; color:var(--text-primary);
+        }
+        .report-exec-summary h4 {
+            font-size:11px; font-weight:700; color:var(--text-muted); text-transform:uppercase;
+            letter-spacing:0.55px; margin:0 0 10px 0;
+        }
+        .report-exec-body { white-space:pre-wrap; color:var(--text-secondary); }
+        /* ── Rep section / subsection titles ── */
+        .rep-section-title { font-size:13px; font-weight:700; color:var(--text-muted); text-transform:uppercase;
+            letter-spacing:0.5px; margin:20px 0 10px 0; padding-bottom:6px; border-bottom:1px solid var(--border); }
+        .rep-subsection-title { font-size:12px; font-weight:600; margin-bottom:4px; }
+        /* ── LLM 인사이트 상태 배지 ── */
+        .rep-status-badge { display:inline-block; padding:3px 10px; border-radius:12px; font-size:13px; font-weight:700; margin-right:8px; }
+        .rep-status-ok { background:rgba(115,191,105,0.18); color:#73bf69; border:1px solid rgba(115,191,105,0.4); }
+        .rep-status-warn { background:rgba(255,152,48,0.18); color:#ff9830; border:1px solid rgba(255,152,48,0.4); }
+        .rep-status-danger { background:rgba(242,73,92,0.18); color:#f2495c; border:1px solid rgba(242,73,92,0.4); }
+        .rep-status-reason { font-size:13px; color:var(--text-secondary); }
+        /* ── 차트 설명문 ── */
+        .chart-desc { font-size:12px; color:var(--text-muted); margin-top:8px; padding:6px 8px;
+            background:var(--bg-secondary); border-radius:4px; line-height:1.55; min-height:0; }
+        /* ── 알림 심각도 배지 ── */
+        .rep-sev-badge { display:inline-block; padding:1px 7px; border-radius:10px; font-size:11px; font-weight:600; }
+        .sev-nc  { background:rgba(170,170,170,0.2); color:#aaa; }
+        .sev-info{ background:rgba(115,191,105,0.2); color:#73bf69; }
+        .sev-warn{ background:rgba(242,204,12,0.2); color:#f2cc0c; }
+        .sev-avg { background:rgba(255,152,48,0.2); color:#ff9830; }
+        .sev-high{ background:rgba(242,73,92,0.2); color:#f2495c; }
+        .sev-dis { background:rgba(242,73,92,0.3); color:#f2495c; border:1px solid #f2495c; }
+        /* ── 알림 상태 ── */
+        .rep-active   { color:#f2495c; font-weight:600; font-size:12px; }
+        .rep-resolved { color:#73bf69; font-size:12px; }
+        /* ── 순위 셀 ── */
+        .rank-gold   { color:#f2cc0c; font-weight:700; }
+        .rank-silver { color:#aaa; font-weight:700; }
+        .rank-bronze { color:#ff9830; font-weight:700; }
+        /* ── Chat 인라인 차트 ── */
+        .chat-charts-wrap { display:grid; grid-template-columns:repeat(auto-fill,minmax(280px,1fr)); gap:14px; margin:14px 0; }
+        .chat-chart-card { background:var(--bg-card); border:1px solid var(--border); border-radius:var(--radius); padding:14px; }
+        .chat-chart-title { font-size:12px; font-weight:600; color:var(--text-muted); margin-bottom:8px; text-transform:uppercase; letter-spacing:0.4px; }
+        /* ── Media queries ── */
+        @media (max-width:1200px) {
+            .content-area { grid-template-columns:1fr 240px; }
+        }
+        @media (max-width:1000px) {
+            .sidebar { display:none; }
+        }
+        @media (max-width:800px) {
+            .content-area { grid-template-columns:1fr; }
+            .sources-panel { border-left:none; border-top:1px solid var(--border); max-height:300px; }
+            .alert-summary-bar { flex-wrap:wrap; }
+            .metrics-grid { grid-template-columns:repeat(2,1fr); }
+        }
+</style>
+</head>
+<body>
+<div class="app-layout">
+
+    <!-- ══ 좌: 사이드바 ══ -->
+    <nav class="sidebar" id="mainSidebar">
+        <!-- Logo + Title -->
+        <div class="sidebar-header">
+            <div class="logo">Z</div>
+            <span class="sidebar-title">Zabbix RAG</span>
+        </div>
+        <div class="chat-sidebar-block" id="chatSidebarBlock" style="flex:1;min-height:0;overflow:hidden;display:flex;flex-direction:column;">
+        <!-- New Session button -->
+        <div class="new-session-wrap">
+            <button class="new-chat-btn" onclick="newSession()">+ New Session</button>
+        </div>
+        <!-- History (기본 접힘) -->
+        <div class="history-section" id="historySection">
+            <div class="history-section-head">
+                <span class="history-label" title="DB: chat_sessions / chat_messages (Report와 별도)">History</span>
+                <button type="button" class="history-toggle-btn" id="historyToggleBtn" aria-expanded="false" title="대화 기록 펼치기">&#9654;</button>
+            </div>
+            <div class="history-list-wrap is-collapsed" id="historyListWrap">
+                <div class="history-list" id="historyList">
+                    <div class="history-empty">아직 대화 기록이 없습니다</div>
+                </div>
+            </div>
+        </div>
+        </div>
+        <div class="report-sidebar-block" id="reportSidebarBlock">
+            <div class="history-section-head" style="padding:4px 6px 8px;">
+                <span class="history-label" title="operational_reports">Report</span>
+                <button type="button" class="history-toggle-btn" onclick="refreshReportList()" title="목록 새로고침">&#8635;</button>
+            </div>
+            <div class="history-list" id="reportHistoryList" style="flex:1; overflow-y:auto;">
+                <div class="history-empty">레포트를 생성하면 여기에 표시됩니다</div>
+            </div>
+        </div>
+        <!-- Model select at footer -->
+        <div class="sidebar-footer">
+            <div class="sidebar-footer-label">Context Sources</div>
+            <div class="sources-list-scroll-wrap" id="sourcesListWrap">
+            <div id="sourcesList"><p style="font-size:13px;color:var(--text-muted);line-height:1.6;">검색 결과의 참조 소스가 여기에 표시됩니다.</p></div>
+            </div>
+            <div class="sidebar-footer-label" style="margin-top:10px;">Health Status</div>
+            <div class="health-row">
+                <span class="health-label">RAG Engine</span>
+                <span class="health-checking" id="healthRag">...</span>
+            </div>
+            <div class="health-row">
+                <span class="health-label">Vector DB</span>
+                <span class="health-checking" id="healthVdb">...</span>
+            </div>
+            <div class="health-row">
+                <span class="health-label">Agent Mesh</span>
+                <span class="health-checking" id="healthAgent">...</span>
+            </div>
+            <div style="font-size:10px;color:var(--text-muted);margin-top:8px;text-align:right;" id="healthLastCheck"></div>
+            <div class="sidebar-footer-label">Model</div>
+            <div class="model-select-row">
+                <div class="model-select-wrap">
+                    <select id="modelSelect" onchange="onModelChange()">
+                        <option value="gpt-5.4" selected>GPT-5.4 (OpenAI)</option>
+                        <option value="qwen2.5:7b">Qwen 2.5 7B (로컬 Ollama)</option>
+                        <option value="qwen2.5:3b">Qwen 2.5 3B (로컬 경량)</option>
+                    </select>
+                </div>
+                <span id="modelSelectBadge" class="model-select-badge msb-openai">OpenAI GPT-5.4</span>
+            </div>
+            <!-- 로컬 Ollama 선택 시 안내 -->
+            <div id="modelSpeedHint" style="display:none;font-size:11px;color:var(--warning);margin-top:5px;padding:5px 8px;background:rgba(255,152,48,0.08);border-radius:4px;line-height:1.5;">
+                ⚠ 로컬 Ollama 모드<br>응답에 수 분이 소요될 수 있습니다.<br>Tool calling 루프·최종 답변 모두 로컬 Qwen 사용.
+            </div>
+            <div id="mcpQuerySection" style="display:none;"></div>
+        </div>
+    </nav>
+
+    <!-- ══ 메인: 상단탭 + 콘텐츠 + 하단입력 ══ -->
+    <div class="main-content">
+
+        <!-- 상단 탭 네비게이션 -->
+        <div class="top-nav">
+            <div class="nav-tabs">
+                <button class="nav-tab" id="tabReport" onclick="switchTab('report',this)">
+                    <span class="nav-tab-icon">&#9633;</span> Report
+                </button>
+                <div class="nav-separator"></div>
+                <button class="nav-tab active" id="tabAnalysis" onclick="switchTab('analysis',this)">
+                    <span class="nav-tab-icon">&#62;_</span> Analysis
+                </button>
+            </div>
+            <div class="nav-spacer"></div>
+            <div class="nav-filter-row" id="navFilterRow">
+                <span class="filter-row-label">카테고리:</span>
+                <button class="filter-chip active" data-cat="all" onclick="toggleFilter(this)">전체</button>
+                <button class="filter-chip" data-cat="server" onclick="toggleFilter(this)">서버</button>
+                <button class="filter-chip" data-cat="network" onclick="toggleFilter(this)">네트워크</button>
+                <button class="filter-chip" data-cat="alert" onclick="toggleFilter(this)">장애</button>
+            </div>
+            <div class="status-badge"><div class="status-dot"></div><span>System Online</span></div>
+        </div>
+
+        <!-- 콘텐츠: 답변 패널 / 레포트 패널 -->
+        <div class="content-area">
+            <main class="answer-panel" id="answerPanel">
+                <div class="empty-state"><div class="empty-state-icon">&#9881;</div><h3>Zabbix RAG 검색</h3><p>모니터링 데이터를 자연어로 검색하고 분석 결과를 확인하세요</p></div>
+            </main>
+            <div class="report-panel-wrap" id="reportPanelWrap">
+                <div class="report-panel-inner" id="reportPanel">
+                    <div class="report-toolbar">
+                        <label>기간 시작</label>
+                        <input type="datetime-local" id="repPeriodStart" />
+                        <label>기간 종료</label>
+                        <input type="datetime-local" id="repPeriodEnd" />
+                        <button type="button" class="report-btn report-btn-secondary" onclick="setReportToday()">오늘</button>
+                        <button type="button" class="report-btn report-btn-secondary" onclick="setReportPreset(7)">최근 7일</button>
+                        <button type="button" class="report-btn report-btn-secondary" onclick="setReportPreset(30)">최근 30일</button>
+                        <button type="button" class="report-btn" onclick="generateOperationalReport()">레포트 생성</button>
+                    </div>
+                    <!-- 생성 메타 -->
+                    <div id="repMeta" style="font-size:12px;color:var(--text-muted);margin-bottom:12px;"></div>
+
+                    <!-- ① LLM 인사이트 패널 (GPT-5.4 분석) -->
+                    <div id="repLlmInsight" style="display:none;margin-bottom:20px;">
+                        <div class="rep-section-title">🤖 AI 운영 인사이트 (GPT-5.4)</div>
+                        <div id="repInsightStatus" style="display:none;margin-bottom:12px;"></div>
+                        <div id="repInsightSummary" class="report-exec-summary" style="display:none;"></div>
+                        <div id="repInsightFindings" style="display:none;margin-bottom:12px;">
+                            <div class="rep-subsection-title">🔍 핵심 발견사항</div>
+                            <ul id="repInsightFindingsList" style="margin:6px 0 0 18px;font-size:13px;color:var(--text-secondary);line-height:1.8;"></ul>
+                        </div>
+                        <div id="repInsightAnomalies" style="display:none;margin-bottom:12px;">
+                            <div class="rep-subsection-title" style="color:var(--warning);">⚠️ 이상 징후</div>
+                            <ul id="repInsightAnomaliesList" style="margin:6px 0 0 18px;font-size:13px;color:var(--warning);line-height:1.8;"></ul>
+                        </div>
+                        <div id="repInsightRecs" style="display:none;margin-bottom:12px;">
+                            <div class="rep-subsection-title" style="color:var(--success);">✅ 권장 조치</div>
+                            <ul id="repInsightRecsList" style="margin:6px 0 0 18px;font-size:13px;color:var(--success);line-height:1.8;"></ul>
+                        </div>
+                    </div>
+
+                    <!-- ② 경고 + KPI 카드 -->
+                    <div id="repWarnings" class="report-warnings" style="display:none;"></div>
+                    <div class="rep-section-title" id="repZabbixHdr" style="display:none;">📊 인프라 현황 스냅샷</div>
+                    <div class="report-kpi-grid" id="repKpiGrid">
+                        <div class="report-kpi-card"><div class="report-kpi-val" id="repKpiServers">—</div><div class="report-kpi-lbl">서버</div></div>
+                        <div class="report-kpi-card"><div class="report-kpi-val" id="repKpiNet">—</div><div class="report-kpi-lbl">네트워크</div></div>
+                        <div class="report-kpi-card"><div class="report-kpi-val" id="repKpiVmHv">—</div><div class="report-kpi-lbl">VMware HV</div></div>
+                        <div class="report-kpi-card"><div class="report-kpi-val" id="repKpiVm">—</div><div class="report-kpi-lbl">VMware VM</div></div>
+                        <div class="report-kpi-card"><div class="report-kpi-val" id="repKpiAlerts">—</div><div class="report-kpi-lbl">기간 내 알림</div></div>
+                        <div class="report-kpi-card"><div class="report-kpi-val" id="repKpiVecRows">—</div><div class="report-kpi-lbl">벡터 데이터 행</div></div>
+                    </div>
+
+                    <!-- ③ 차트 Row1: 자산구성(도넛) + 심각도(도넛) -->
+                    <div id="repZabbixChartsHdr" class="rep-section-title" style="display:none;">📈 알림 분석 차트</div>
+                    <div class="report-charts-row" id="repChartsRow1">
+                        <div class="report-chart-card">
+                            <div class="report-chart-title">🖥️ 자산 구성 (유형별 대수)</div>
+                            <canvas id="chartAssetMix"></canvas>
+                            <div class="chart-desc" id="descAssetMix"></div>
+                        </div>
+                        <div class="report-chart-card">
+                            <div class="report-chart-title">🚨 알림 심각도 분포</div>
+                            <canvas id="chartAlertPri"></canvas>
+                            <div class="chart-desc" id="descAlertPri"></div>
+                        </div>
+                    </div>
+                    <!-- ③ 차트 Row2: 일별 알림 시계열(라인/바 혼합) -->
+                    <div class="report-charts-row" id="repChartsRow2" style="display:none;">
+                        <div class="report-chart-card" style="grid-column:1/-1;">
+                            <div class="report-chart-title">📅 일별 알림 건수 추이 (시계열 · 평균선 포함)</div>
+                            <div style="position:relative;height:240px;"><canvas id="chartAlertDay"></canvas></div>
+                            <div class="chart-desc" id="descAlertDay"></div>
+                        </div>
+                    </div>
+                    <!-- ③ 차트 Row3: RAG 벡터 카테고리 + 테이블 분포 -->
+                    <div id="repVecChartsHdr" class="rep-section-title" style="display:none;">🗄️ RAG 벡터 DB 데이터 분포</div>
+                    <div class="report-charts-row" id="repChartsRow3" style="display:none;">
+                        <div class="report-chart-card">
+                            <div class="report-chart-title">📂 도메인별 데이터 비중 (가로 바)</div>
+                            <canvas id="chartVecCat"></canvas>
+                        </div>
+                        <div class="report-chart-card">
+                            <div class="report-chart-title">📊 상위 10 테이블 데이터량</div>
+                            <canvas id="chartVecTbl"></canvas>
+                        </div>
+                    </div>
+
+                    <!-- ④ 상위 알림 자산 표 -->
+                    <div class="rep-section-title" id="repTableTopHdr" style="display:none;">🏆 알림 상위 자산</div>
+                    <div id="repTableTopWrap" style="display:none;" class="report-table-wrap">
+                        <table class="report-table" id="repTableTop"><thead><tr><th>순위</th><th>자산</th><th>건수</th></tr></thead><tbody></tbody></table>
+                    </div>
+
+                    <!-- ⑤ 기간 내 알림 샘플 표 -->
+                    <div class="rep-section-title" id="repTableSampleHdr" style="display:none;">📋 기간 내 알림 샘플</div>
+                    <div id="repTableSampleWrap" style="display:none;" class="report-table-wrap">
+                        <table class="report-table" id="repTableSample"><thead><tr><th>시각</th><th>자산</th><th>심각도</th><th>상태</th><th>알림 이름</th></tr></thead><tbody></tbody></table>
+                    </div>
+
+                    <!-- ⑥ 종합 분석 원문 (접기/펼치기) -->
+                    <div id="repExecutiveSummaryWrap" style="display:none;margin-top:16px;">
+                        <div class="rep-section-title" style="cursor:pointer;" onclick="toggleRawSummary()">📝 종합 분석 원문 <span id="rawSummaryToggle" style="font-size:11px;color:var(--text-muted);">[펼치기]</span></div>
+                        <div id="repExecutiveSummary" class="report-exec-summary" style="display:none;"></div>
+                    </div>
+
+                    <!-- RAG 벡터 KPI (hidden – JS 참조용) -->
+                    <div id="repVectorKpiStrip" style="display:none;">
+                        <div class="report-kpi-grid" style="grid-template-columns:repeat(auto-fill,minmax(150px,1fr));">
+                            <div class="report-kpi-card"><div class="report-kpi-val" id="repKpiVecTbl">—</div><div class="report-kpi-lbl">데이터 있는 테이블 / 감시</div></div>
+                            <div class="report-kpi-card"><div class="report-kpi-val" id="repKpiVecTop" style="font-size:15px;line-height:1.35;">—</div><div class="report-kpi-lbl">기간 내 행 수 1위</div></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 하단 입력창 -->
+        <div class="bottom-input" id="bottomInputBar">
+            <div class="search-bar">
+                <input type="text" class="search-input" id="searchInput" placeholder="Ask Zabbix RAG anything about your infrastructure..." onkeydown="if(event.key==='Enter')doSearch()">
+            </div>
+            <button id="searchBtn" onclick="doSearch()" style="display:none;"></button>
+        </div>
+
+    </div>
+</div>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js" crossorigin="anonymous"></script>
+<script>
+/* ── 탭 전환: Analysis vs Report ── */
+var currentMainTab = 'analysis';
+function switchTab(tab, el){
+    document.querySelectorAll('.nav-tab').forEach(function(t){t.classList.remove('active')});
+    el.classList.add('active');
+    currentMainTab = tab;
+    var isReport = tab === 'report';
+    var ap = document.getElementById('answerPanel');
+    var rw = document.getElementById('reportPanelWrap');
+    var bottom = document.getElementById('bottomInputBar');
+    var filt = document.getElementById('navFilterRow');
+    var side = document.getElementById('mainSidebar');
+    if(isReport){
+        if(side) side.classList.add('sidebar-mode-report');
+        if(ap) ap.style.display = 'none';
+        if(rw){ rw.classList.add('visible'); rw.style.display = 'flex'; }
+        if(bottom) bottom.style.display = 'none';
+        if(filt) filt.style.visibility = 'hidden';
+        initReportPanelDefaults();
+        refreshReportList();
+    } else {
+        if(side) side.classList.remove('sidebar-mode-report');
+        if(ap) ap.style.display = '';
+        if(rw){ rw.classList.remove('visible'); rw.style.display = 'none'; }
+        if(bottom) bottom.style.display = '';
+        if(filt) filt.style.visibility = '';
+        if(typeof loadHistoryFromDB === 'function'){ loadHistoryFromDB(); }
+    }
+}
+var reportCharts = { asset:null, pri:null, day:null, vecCat:null, vecTbl:null };
+function destroyReportCharts(){
+    ['asset','pri','day','vecCat','vecTbl'].forEach(function(k){
+        if(reportCharts[k]){ try{ reportCharts[k].destroy(); }catch(e){} reportCharts[k]=null; }
+    });
+}
+function fmtLocalDT(d){
+    function pad(n){ return n<10?'0'+n:''+n; }
+    return d.getFullYear()+'-'+pad(d.getMonth()+1)+'-'+pad(d.getDate())+'T'+pad(d.getHours())+':'+pad(d.getMinutes());
+}
+function initReportPanelDefaults(){
+    var s=document.getElementById('repPeriodStart'), e=document.getElementById('repPeriodEnd');
+    if(!s||!e) return;
+    if(!s.value || !e.value){
+        var end = new Date();
+        var start = new Date(end.getTime() - 7*24*3600*1000);
+        e.value = fmtLocalDT(end);
+        s.value = fmtLocalDT(start);
+    }
+}
+function setReportPreset(days){
+    var end = new Date();
+    var start = new Date(end.getTime() - days*24*3600*1000);
+    document.getElementById('repPeriodEnd').value = fmtLocalDT(end);
+    document.getElementById('repPeriodStart').value = fmtLocalDT(start);
+}
+function setReportToday(){
+    var end = new Date();
+    var start = new Date(end.getFullYear(), end.getMonth(), end.getDate(), 0, 0, 0, 0);
+    document.getElementById('repPeriodEnd').value = fmtLocalDT(end);
+    document.getElementById('repPeriodStart').value = fmtLocalDT(start);
+}
+/* ══════════════════════════════════════════════════
+   renderReportPayload  v6  — 완전 리뉴얼
+   · LLM 인사이트(GPT-5.4) 패널
+   · KPI 카드 + 벡터 KPI
+   · 차트 4종: 자산구성(도넛), 심각도(도넛), 일별알림(라인/바), 카테고리(바)
+   · 테이블 2종: 상위자산, 알림샘플
+   · 종합 분석 원문 (접기/펼치기)
+══════════════════════════════════════════════════ */
+function renderReportPayload(payload, metaTitle){
+    if(!payload || typeof payload !== 'object') payload = {};
+    destroyReportCharts();
+
+    /* ── 메타 헤더 ── */
+    var meta = document.getElementById('repMeta');
+    var gen = payload.generated_at || '';
+    var periodTxt = '';
+    if(payload.period && payload.period.start && payload.period.end){
+        var ps = payload.period.start.replace('T',' ').slice(0,16);
+        var pe = payload.period.end.replace('T',' ').slice(0,16);
+        periodTxt = '  |  기간: ' + ps + ' ~ ' + pe;
+    }
+    if(meta) meta.textContent = (metaTitle || (gen ? '생성: '+gen.replace('T',' ').slice(0,16)+' UTC' : '')) + periodTxt;
+
+    var colors6 = ['#5794f2','#73bf69','#f2cc0c','#ff9830','#f2495c','#b877d9'];
+    var sevColors = {'P0':'#aaa','P1':'#73bf69','P2':'#f2cc0c','P3':'#ff9830','P4':'#f2495c','P5':'#f2495c'};
+    var chartsData = payload.charts || {};
+    var k = payload.kpis || {};
+    var vk = payload.vector_period_kpis || {};
+    var ins = payload.llm_insight || {};
+
+    /* ── ① LLM 인사이트 패널 ── */
+    var insPanel = document.getElementById('repLlmInsight');
+    if(insPanel){
+        if(ins && ins.status){
+            insPanel.style.display = 'block';
+            /* 상태 배지 */
+            var stEl = document.getElementById('repInsightStatus');
+            if(stEl){
+                var stCls = ins.status==='양호'?'rep-status-ok':ins.status==='위험'?'rep-status-danger':'rep-status-warn';
+                stEl.style.display = 'block';
+                stEl.innerHTML = '<span class="rep-status-badge '+stCls+'">'+esc(ins.status)+'</span>'
+                    +(ins.status_reason?'<span class="rep-status-reason"> '+esc(ins.status_reason)+'</span>':'');
+            }
+            /* 경영진 요약 */
+            var sumEl = document.getElementById('repInsightSummary');
+            if(sumEl && ins.executive_summary){
+                sumEl.style.display = 'block';
+                sumEl.textContent = ins.executive_summary;
+            }
+            /* 핵심 발견 */
+            var fEl = document.getElementById('repInsightFindings');
+            var fList = document.getElementById('repInsightFindingsList');
+            if(fEl && fList && ins.key_findings && ins.key_findings.length){
+                fEl.style.display = 'block';
+                fList.innerHTML = ins.key_findings.map(function(f){ return '<li>'+esc(f)+'</li>'; }).join('');
+            }
+            /* 이상 징후 */
+            var aEl = document.getElementById('repInsightAnomalies');
+            var aList = document.getElementById('repInsightAnomaliesList');
+            if(aEl && aList && ins.anomalies && ins.anomalies.length){
+                aEl.style.display = 'block';
+                aList.innerHTML = ins.anomalies.map(function(a){ return '<li>'+esc(a)+'</li>'; }).join('');
+            }
+            /* 권장 조치 */
+            var rEl = document.getElementById('repInsightRecs');
+            var rList = document.getElementById('repInsightRecsList');
+            if(rEl && rList && ins.recommendations && ins.recommendations.length){
+                rEl.style.display = 'block';
+                rList.innerHTML = ins.recommendations.map(function(r){ return '<li>'+esc(r)+'</li>'; }).join('');
+            }
+        } else {
+            insPanel.style.display = 'none';
+        }
+    }
+
+    /* ── ② 경고 ── */
+    var wr = document.getElementById('repWarnings');
+    var warns = payload.warnings || [];
+    if(wr){
+        if(warns.length){
+            wr.style.display = 'block';
+            wr.innerHTML = '<strong>⚠ 집계 참고</strong><ul>'+warns.map(function(w){return '<li>'+esc(w)+'</li>';}).join('')+'</ul>';
+        } else { wr.style.display='none'; wr.innerHTML=''; }
+    }
+
+    /* ── ③ 섹션 헤더 표시 ── */
+    ['repZabbixHdr','repZabbixChartsHdr','repVecChartsHdr'].forEach(function(id){
+        var el=document.getElementById(id); if(el) el.style.display='block';
+    });
+
+    /* ── ④ KPI 카드 ── */
+    function setKpi(id, val){ var el=document.getElementById(id); if(el) el.textContent=(val!=null?val:'—'); }
+    setKpi('repKpiServers', k.servers);
+    setKpi('repKpiNet', k.network);
+    setKpi('repKpiVmHv', k.vmware_hypervisors);
+    setKpi('repKpiVm', k.vmware_vms);
+    setKpi('repKpiAlerts', k.alerts_in_period);
+    setKpi('repKpiVecRows', vk.rows_in_period_total);
+
+    /* 벡터 KPI 보조 */
+    var vks = document.getElementById('repVectorKpiStrip');
+    if(vks && vk && vk.rows_in_period_total != null){
+        vks.style.display = 'block';
+        var elTbl = document.getElementById('repKpiVecTbl');
+        var elTop = document.getElementById('repKpiVecTop');
+        if(elTbl) elTbl.textContent = (vk.tables_with_data_count||0)+' / '+(vk.tables_tracked_count||0);
+        if(elTop){
+            var tbp = vk.top_by_in_period;
+            elTop.textContent = (tbp&&tbp.length) ? tbp[0].table+'('+tbp[0].rows+'행)' : '—';
+        }
+    }
+
+    /* ── ⑤ 차트 공통 옵션 ── */
+    if(typeof Chart === 'undefined') return; /* Chart.js 미로드 시 스킵 */
+
+    var doughLegend = { position:'bottom', labels:{ color:'#9fa7b3', font:{size:11}, padding:10 } };
+    var doughOpts = { responsive:true, maintainAspectRatio:true, cutout:'60%',
+        plugins:{ legend: doughLegend, tooltip:{ callbacks:{
+            label: function(ctx){ var total=ctx.dataset.data.reduce(function(a,b){return a+b;},0);
+                var pct = total>0?Math.round(ctx.parsed/total*100):0;
+                return ctx.label+': '+ctx.parsed+'대 ('+pct+'%)'; }
+        }}}
+    };
+    var barGridColor = 'rgba(255,255,255,0.07)';
+    var tickColor = '#9fa7b3';
+
+    /* ── ⑤-A 자산 구성 도넛 ── */
+    var am = chartsData.asset_mix || {labels:[],values:[]};
+    var ctx1 = document.getElementById('chartAssetMix');
+    if(ctx1 && am.labels && am.labels.length){
+        reportCharts.asset = new Chart(ctx1, {
+            type:'doughnut',
+            data:{ labels:am.labels, datasets:[{ data:am.values, backgroundColor:colors6, borderWidth:2, borderColor:'#1a1f2e' }] },
+            options: doughOpts
+        });
+        /* 설명문 */
+        _setChartDesc('descAssetMix',
+            '현재 관리 중인 전체 자산 '+am.values.reduce(function(a,b){return a+b;},0)+'대의 유형별 분포입니다. '
+            +(am.labels.length?am.labels[0]+' 비중이 가장 높습니다.':''));
+    }
+
+    /* ── ⑤-B 심각도 도넛 ── */
+    var ap = chartsData.alerts_by_priority || {labels:[],values:[]};
+    var priColors = ap.labels ? ap.labels.map(function(l){
+        var m=l.match(/P(\d)/); return m?sevColors['P'+m[1]]:'#aaa';
+    }) : colors6;
+    var ctx2 = document.getElementById('chartAlertPri');
+    if(ctx2 && ap.labels && ap.labels.length){
+        reportCharts.pri = new Chart(ctx2, {
+            type:'doughnut',
+            data:{ labels:ap.labels, datasets:[{ data:ap.values, backgroundColor:priColors, borderWidth:2, borderColor:'#1a1f2e' }] },
+            options: doughOpts
+        });
+        var totalAlerts = ap.values.reduce(function(a,b){return a+b;},0);
+        var highIdx = ap.values.reduce(function(mi,v,i,arr){return v>arr[mi]?i:mi;},0);
+        _setChartDesc('descAlertPri',
+            '기간 내 총 '+totalAlerts+'건의 알림이 발생했습니다. '
+            +(ap.labels[highIdx]?' 가장 많은 심각도는 '+ap.labels[highIdx]+' ('+ap.values[highIdx]+'건)입니다.':''));
+    }
+
+    /* ── ⑤-C 일별 알림 시계열 (라인 + 바 mixed) ── */
+    var ad = chartsData.alerts_by_day || {labels:[],values:[]};
+    var ctx3 = document.getElementById('chartAlertDay');
+    if(ctx3){
+        var adAvg = ad.values && ad.values.length ? ad.values.reduce(function(a,b){return a+b;},0)/ad.values.length : 0;
+        reportCharts.day = new Chart(ctx3, {
+            type:'bar',
+            data:{
+                labels: ad.labels || [],
+                datasets:[
+                    { type:'bar', label:'일별 알림', data:ad.values||[], backgroundColor:'rgba(87,148,242,0.45)', borderColor:'#5794f2', borderWidth:1, order:2 },
+                    { type:'line', label:'평균선', data:(ad.labels||[]).map(function(){return Math.round(adAvg*10)/10;}),
+                      borderColor:'#f2cc0c', borderWidth:1.5, borderDash:[4,3], pointRadius:0, fill:false, order:1 }
+                ]
+            },
+            options:{
+                responsive:true, maintainAspectRatio:false,
+                scales:{
+                    x:{ ticks:{color:tickColor, maxRotation:45}, grid:{color:barGridColor} },
+                    y:{ beginAtZero:true, ticks:{color:tickColor}, grid:{color:barGridColor} }
+                },
+                plugins:{ legend:{labels:{color:tickColor,font:{size:11}}},
+                    tooltip:{ callbacks:{
+                        afterBody: function(items){ return items[0]?['평균 대비: '+(items[0].parsed.y-adAvg>0?'+':'')+Math.round((items[0].parsed.y-adAvg)*10)/10+'건']:[]; }
+                    }}
+                }
+            }
+        });
+        if(ad.values && ad.values.length){
+            var peakI = ad.values.indexOf(Math.max.apply(null,ad.values));
+            _setChartDesc('descAlertDay',
+                '총 '+ad.labels.length+'일 구간 알림 추이입니다. 일 평균 '+Math.round(adAvg*10)/10+'건, '
+                +(ad.labels[peakI]?'최고점은 '+ad.labels[peakI]+' ('+ad.values[peakI]+'건)입니다.':''));
+        }
+        document.getElementById('repChartsRow2').style.display = 'block';
+    }
+
+    /* ── ⑤-D RAG 카테고리 + 상위 테이블 바 차트 ── */
+    var vc = chartsData.vector_by_category || {labels:[],values:[]};
+    var vt = chartsData.vector_top_tables || {labels:[],values:[]};
+    var ctx4 = document.getElementById('chartVecCat');
+    if(ctx4 && vc.labels && vc.labels.length){
+        reportCharts.vecCat = new Chart(ctx4, {
+            type:'bar',
+            data:{ labels:vc.labels, datasets:[{
+                label:'벡터 데이터 행', data:vc.values,
+                backgroundColor:colors6.slice(0,vc.labels.length),
+                borderWidth:0
+            }]},
+            options:{
+                indexAxis:'y', responsive:true, maintainAspectRatio:true,
+                scales:{
+                    x:{ beginAtZero:true, ticks:{color:tickColor}, grid:{color:barGridColor} },
+                    y:{ ticks:{color:tickColor}, grid:{color:'transparent'} }
+                },
+                plugins:{ legend:{display:false} }
+            }
+        });
+    }
+    var ctx5 = document.getElementById('chartVecTbl');
+    if(ctx5 && vt.labels && vt.labels.length){
+        reportCharts.vecTbl = new Chart(ctx5, {
+            type:'bar',
+            data:{ labels:vt.labels, datasets:[{
+                label:'행 수', data:vt.values,
+                backgroundColor:'rgba(115,191,105,0.55)', borderColor:'#73bf69', borderWidth:1
+            }]},
+            options:{
+                indexAxis:'y', responsive:true, maintainAspectRatio:true,
+                scales:{
+                    x:{ beginAtZero:true, ticks:{color:tickColor}, grid:{color:barGridColor} },
+                    y:{ ticks:{color:tickColor, font:{size:10}}, grid:{color:'transparent'} }
+                },
+                plugins:{ legend:{display:false} }
+            }
+        });
+        document.getElementById('repChartsRow3').style.display = 'block';
+    }
+
+    /* ── ⑥ 상위 알림 자산 표 ── */
+    var topWrap = document.getElementById('repTableTopWrap');
+    var topHdr = document.getElementById('repTableTopHdr');
+    var topBody = document.querySelector('#repTableTop tbody');
+    var topRows = (payload.tables && payload.tables.top_alert_assets) ? payload.tables.top_alert_assets : [];
+    if(topBody){
+        topBody.innerHTML = '';
+        topRows.forEach(function(row, idx){
+            var rankCls = idx===0?'rank-gold':idx===1?'rank-silver':idx===2?'rank-bronze':'';
+            topBody.innerHTML += '<tr><td class="'+rankCls+'">'+(idx+1)+'</td><td>'+esc(row.asset||'')+'</td><td>'+esc(String(row.count||0))+'</td></tr>';
+        });
+    }
+    if(topWrap) topWrap.style.display = topRows.length?'block':'none';
+    if(topHdr) topHdr.style.display = topRows.length?'block':'none';
+
+    /* ── ⑦ 알림 샘플 표 ── */
+    var sampWrap = document.getElementById('repTableSampleWrap');
+    var sampHdr = document.getElementById('repTableSampleHdr');
+    var sampBody = document.querySelector('#repTableSample tbody');
+    var sampRows = (payload.tables && payload.tables.recent_alerts_sample) ? payload.tables.recent_alerts_sample : [];
+    var sevBadgeMap = {'Not classified':'sev-nc','Information':'sev-info','Warning':'sev-warn','Average':'sev-avg','High':'sev-high','Disaster':'sev-dis'};
+    if(sampBody){
+        sampBody.innerHTML = '';
+        sampRows.forEach(function(row){
+            var sc = sevBadgeMap[row.priority_text]||'sev-nc';
+            var stCls = row.status==='Active'?'rep-active':'rep-resolved';
+            sampBody.innerHTML += '<tr>'
+                +'<td style="font-size:11px;white-space:nowrap;">'+esc(row.time||'')+'</td>'
+                +'<td>'+esc(row.asset||'')+'</td>'
+                +'<td><span class="rep-sev-badge '+sc+'">'+esc(row.priority_text||'')+'</span></td>'
+                +'<td><span class="'+stCls+'">'+esc(row.status||'')+'</span></td>'
+                +'<td style="font-size:12px;max-width:300px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="'+esc(row.name||'')+'">'+esc(row.name||'')+'</td>'
+                +'</tr>';
+        });
+    }
+    if(sampWrap) sampWrap.style.display = sampRows.length?'block':'none';
+    if(sampHdr) sampHdr.style.display = sampRows.length?'block':'none';
+
+    /* ── ⑧ 종합 분석 원문 ── */
+    var exWrap = document.getElementById('repExecutiveSummaryWrap');
+    var rex = document.getElementById('repExecutiveSummary');
+    var ex = payload.executive_summary;
+    if(rex && ex && String(ex).trim()){
+        rex.innerHTML = String(ex).replace(/\n/g,'<br>');
+        if(exWrap) exWrap.style.display = 'block';
+    } else if(exWrap){ exWrap.style.display = 'none'; }
+}
+
+/* 차트 아래 설명문 삽입 헬퍼 */
+function _setChartDesc(id, txt){
+    var el = document.getElementById(id);
+    if(el && txt) el.textContent = txt;
+}
+
+/* 종합 분석 원문 접기/펼치기 */
+function toggleRawSummary(){
+    var rex=document.getElementById('repExecutiveSummary');
+    var tog=document.getElementById('rawSummaryToggle');
+    if(!rex) return;
+    var isHidden = rex.style.display==='none'||rex.style.display==='';
+    rex.style.display = isHidden?'block':'none';
+    if(tog) tog.textContent = isHidden?'[접기]':'[펼치기]';
+}
+async function generateOperationalReport(){
+    var s = document.getElementById('repPeriodStart').value;
+    var e = document.getElementById('repPeriodEnd').value;
+    if(!s||!e){ alert('기간 시작·종료를 선택하세요.'); return; }
+    var ds = new Date(s);
+    var de = new Date(e);
+    try{
+        var resp = await fetch('/api/reports/generate', {
+            method:'POST',
+            headers:{'Content-Type':'application/json'},
+            body: JSON.stringify({ period_start: ds.toISOString(), period_end: de.toISOString() })
+        });
+        if(!resp.ok){
+            var err = await resp.json().catch(function(){return{};});
+            var msg = err.detail;
+            if(Array.isArray(msg)) msg = msg.map(function(x){return x.msg||x;}).join(', ');
+            throw new Error(msg||resp.statusText);
+        }
+        var data = await resp.json();
+        renderReportPayload(data.payload, data.title || '');
+        refreshReportList();
+    } catch(err){
+        alert('레포트 생성 실패: ' + (err && err.message ? err.message : err));
+    }
+}
+async function refreshReportList(){
+    var box = document.getElementById('reportHistoryList');
+    if(!box) return;
+    try{
+        var resp = await fetch('/api/reports?limit=50');
+        if(!resp.ok) throw new Error('list failed');
+        var data = await resp.json();
+        var rows = data.reports || [];
+        if(!rows.length){
+            box.innerHTML = '<div class="history-empty">저장된 레포트가 없습니다</div>';
+            return;
+        }
+        var h = '';
+        for(var i=0;i<rows.length;i++){
+            var r = rows[i];
+            h += '<div class="history-item" data-rid="'+r.id+'" onclick="loadSavedReport('+r.id+')">';
+            h += '<span class="history-item-title">'+esc(r.title||('#'+r.id))+'</span>';
+            h += '<span class="history-item-delete" onclick="event.stopPropagation();deleteSavedReport('+r.id+')">✕</span></div>';
+        }
+        box.innerHTML = h;
+    } catch(e){
+        box.innerHTML = '<div class="history-empty">목록을 불러올 수 없습니다</div>';
+    }
+}
+async function loadSavedReport(id){
+    try{
+        var resp = await fetch('/api/reports/'+id);
+        if(!resp.ok) throw new Error('load failed');
+        var data = await resp.json();
+        renderReportPayload(data.payload, data.title || '');
+        document.querySelectorAll('#reportHistoryList .history-item').forEach(function(el){
+            el.classList.toggle('active', el.getAttribute('data-rid')==String(id));
+        });
+    } catch(e){
+        alert('레포트를 불러올 수 없습니다');
+    }
+}
+async function deleteSavedReport(id){
+    if(!confirm('이 레포트를 삭제할까요?')) return;
+    try{
+        var resp = await fetch('/api/reports/'+id, { method:'DELETE' });
+        if(!resp.ok) throw new Error('delete failed');
+        refreshReportList();
+    } catch(e){ alert('삭제 실패'); }
+}
+/* ── 상태 변수 ── */
+var activeCategory='all';
+var currentTimeFilter=null, currentDataSource='rag', currentMcpQueries=[], currentLlmModel='', currentEmbedModel='';
+var currentSessionId=null;
+
+/* 세션별 /api/chat 스트림 진행 중 — A가 돌아갈 때도 B에서 새 질의 가능 */
+var inflightSSEBySession={};
+function updateSearchButtonForInflight(){
+    var btn=document.getElementById('searchBtn');
+    if(!btn) return;
+    var sid=currentSessionId;
+    btn.disabled=!!(sid&&inflightSSEBySession[sid]);
+}
+
+/* 세션별 SSE 진행 중(도구/합성) — 다른 대화로 전환해도 완료 시 DB 반영 + 목록 갱신, 재진입 시 로딩 표시 */
+var pendingSSEBySession={};
+
+/* DB에서 불러온 세션 목록 캐시: [ {session_id, title, message_count, ...} ] */
+var dbSessions=[];
+
+/* ── 유틸리티 ── */
+function genId(){ return Date.now().toString(36)+Math.random().toString(36).substr(2,6); }
+function esc(s){ if(s==null)return''; return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+/* metric-card value 포맷: esc 처리 후 ' → ' 앞에 <br> 삽입 */
+function fmtVal(s){ return esc(s).replace(/ → /g,'<br>→ '); }
+/* 빈 metric-card / 빈 metrics-grid 방지: label·value가 모두 비어 있으면 제외 */
+function filterValidMetrics(metrics){
+    if(!metrics||!metrics.length) return [];
+    var out=[];
+    for(var i=0;i<metrics.length;i++){
+        var m=metrics[i];
+        if(!m||typeof m!=='object') continue;
+        var lb=String(m.label==null?'':m.label).trim();
+        var val=String(m.value==null?'':m.value).trim();
+        if(lb||val) out.push(m);
+    }
+    return out;
+}
+function getTypeLabel(t){ return{status:'상태 조회',list:'목록 조회',alert:'장애 조회',analysis:'비교/분석',general:'일반 질문',log:'로그 조회',inventory:'자산 인벤토리',process:'프로세스 분석'}[t]||t; }
+
+/* ── v21.5: 분석·권장사항 포맷 헬퍼
+   1) 마침표·\n 기준 문장 분리 → <p> 태그로 줄바꿈
+   2) 숫자+단위 패턴 → <span class="num-hi"> 강조색
+*/
+function fmtAnalysis(text){
+    if(!text) return '';
+    var raw = String(text);
+    var lines = raw.split(/\n+/);
+    var sentences = [];
+    for(var i=0;i<lines.length;i++){
+        var line = lines[i].trim();
+        if(!line) continue;
+        // 소수점 보호: "숫자.숫자" → 임시 마커
+        var tmp = line.replace(/(\d)\.(\d)/g,'$1\x00$2');
+        // 마침표+공백/줄끝 → 분리 마커
+        tmp = tmp.replace(/\.(\s+|$)/g,'.\x01');
+        // 소수점 복원
+        tmp = tmp.replace(/\x00/g,'.');
+        var parts = tmp.split('\x01');
+        for(var j=0;j<parts.length;j++){
+            var s=parts[j].trim();
+            if(s) sentences.push(s+(j<parts.length-1&&s.slice(-1)!=='.'?'.':''));
+        }
+    }
+    if(!sentences.length) sentences=[raw];
+    // 수치 강조
+    var numPat=/(\d[\d,]*(?:\.\d+)?)\s*(%|GB|MB|KB|TB|Gbps|Mbps|Kbps|bps|ms|초|분|시간|회|건|개|대|MHz|GHz|°C|℃|W|RPM|IOPS)/g;
+    var h='';
+    for(var k=0;k<sentences.length;k++){
+        var safe=esc(sentences[k]);
+        safe=safe.replace(numPat,'<span class="num-hi">$1 $2</span>');
+        h+='<p>'+safe+'</p>';
+    }
+    return h;
+}
+function getSourceLabel(s){ return{mcp:'&#9889; Zabbix 실시간',rag:'&#128269; 벡터DB 검색',hybrid:'&#128260; 실시간+벡터DB'}[s]||s; }
+function getSourceClass(s){ return{mcp:'badge-mcp',rag:'badge-rag',hybrid:'badge-hybrid'}[s]||'badge-rag'; }
+function getTypeClass(t){ return{status:'qbadge-status',list:'qbadge-list',alert:'qbadge-alert',analysis:'qbadge-analysis',general:'qbadge-type',log:'qbadge-mcp',inventory:'qbadge-rag',process:'qbadge-type'}[t]||'qbadge-type'; }
+function getSrcBadgeClass(s){ return{mcp:'qbadge-mcp',rag:'qbadge-rag',hybrid:'qbadge-hybrid'}[s]||'qbadge-rag'; }
+/* 질문 우측 badge 조합: [질문유형] [🔍 RAG벡터검색/agent] — 한 줄 단일 Row */
+function buildQueryChips(category, queryType, dataSource, modelId){
+    var typeKey = queryType || (category==='all'?'general':category);
+    var typeLabel = getTypeLabel(typeKey);
+    var typeClass = getTypeClass(typeKey);
+    var srcLabel = getSourceLabel(dataSource||'rag');
+    var srcClass = getSrcBadgeClass(dataSource||'rag');
+    var chips = '';
+    chips += '<span class="qbadge '+typeClass+'">'+typeLabel+'</span>';
+    chips += '<span class="qbadge '+srcClass+'">'+srcLabel+'</span>';
+    /* LLM 모델 뱃지: modelId가 있으면 모델명만 표시 */
+    if(modelId){
+        var mLabel = String(modelId).split('/').pop(); // meta-llama/xxx → xxx
+        chips += '<span class="qbadge qbadge-model">'+esc(mLabel)+'</span>';
+    }
+    return chips;
+}
+
+/* ── 모델 선택 ── */
+var MODEL_INFO = {
+    'gpt-5.4':    { badge:'OpenAI GPT-5.4',  cls:'msb-openai' },
+    'qwen2.5:7b': { badge:'Ollama 로컬 7B',   cls:'msb-ollama'  },
+    'qwen2.5:3b': { badge:'Ollama 로컬 3B',   cls:'msb-ollama'  },
+};
+function onModelChange(){
+    var sel=document.getElementById('modelSelect'), v=sel.value;
+    var info=MODEL_INFO[v]||MODEL_INFO['gpt-5.4'];
+    var badge=document.getElementById('modelSelectBadge');
+    badge.textContent=info.badge;
+    badge.className='model-select-badge '+info.cls;
+    /* 로컬 Ollama 선택 시 응답 시간 안내 */
+    var hint=document.getElementById('modelSpeedHint');
+    if(hint) hint.style.display=(v==='qwen2.5:7b'||v==='qwen2.5:3b')?'block':'none';
+}
+(function(){
+    fetch('/api/models').then(function(r){return r.json();}).then(function(data){
+        if(!data.models||!data.models.length) return;
+        var sel=document.getElementById('modelSelect');
+        sel.innerHTML='';
+        var defId=data.default||'gpt-5.4';
+        data.models.forEach(function(m){
+            var opt=document.createElement('option');
+            opt.value=m.id;
+            opt.textContent=m.display_name||m.id;
+            if(m.id===defId) opt.selected=true;
+            sel.appendChild(opt);
+        });
+        onModelChange();
+    }).catch(function(){ onModelChange(); });
+})();
+
+/* ── 필터 / 제안 ── */
+function toggleFilter(el){ document.querySelectorAll('.filter-chip').forEach(function(c){c.classList.remove('active')}); el.classList.add('active'); activeCategory=el.dataset.cat; }
+function useSuggestion(t){ document.getElementById('searchInput').value=t; doSearch(); }
+
+/* ── 세션 관리 ── */
+function newSession(){
+    currentSessionId=genId();
+    var panel=document.getElementById('answerPanel');
+    panel.innerHTML='<div class="empty-state"><div class="empty-state-icon">&#9881;</div><h3>Zabbix RAG 검색</h3><p>모니터링 데이터를 자연어로 검색하고 분석 결과를 확인하세요</p></div>';
+    document.getElementById('sourcesList').innerHTML='<p style="font-size:13px;color:var(--text-muted);line-height:1.6;">검색 결과의 참조 소스가 여기에 표시됩니다.</p>';
+    document.getElementById('mcpQuerySection').innerHTML='';
+    var _ss0=document.getElementById('statsSection'); if(_ss0) _ss0.style.display='none';
+    document.getElementById('searchInput').value='';
+    document.getElementById('searchInput').focus();
+    renderHistoryList();
+    updateSearchButtonForInflight();
+}
+
+/* DB에서 세션의 메시지를 불러와 화면에 복원 */
+async function loadSession(sid){
+    currentSessionId=sid;
+    var panel=document.getElementById('answerPanel');
+    panel.innerHTML='<div class="loading-state"><div class="loading-spinner"></div><div class="loading-text">대화 이력 불러오는 중...</div></div>';
+
+    try {
+        var resp = await fetch('/api/history/'+encodeURIComponent(sid));
+        if(!resp.ok) throw new Error('세션 조회 실패');
+        var data = await resp.json();
+        var messages = data.messages || [];
+
+        if(messages.length===0 && !pendingSSEBySession[sid]){
+            panel.innerHTML='<div class="empty-state"><div class="empty-state-icon">&#9881;</div><h3>Zabbix RAG 검색</h3><p>모니터링 데이터를 자연어로 검색하고 분석 결과를 확인하세요</p></div>';
+        } else {
+            panel.innerHTML='';
+            /* 시간순: 오래된 질의가 위, 최신이 아래 (API는 created_at ASC) */
+            for(var i=0; i<messages.length; i++){
+                var msg = messages[i];
+                var resultData = msg.result || {};
+                var sources = msg.sources || [];
+                var modelInfo = msg.model_info || {};
+
+                /* 메시지 HTML 생성 */
+                var msgHtml = '<div class="chat-message">';
+                msgHtml += '<div class="chat-query"><div class="chat-query-icon">Q</div><div class="chat-query-text">'+esc(msg.query)+'</div><div class="chat-query-chips">'+buildQueryChips(msg.category, resultData.query_type, (msg.model_info&&msg.model_info.data_source)||'rag', (msg.model_info&&msg.model_info.llm)||'')+'</div></div>';
+                msgHtml += '<div class="chat-answer">'+buildResultHtml(resultData, msg.query)+'</div>';
+                msgHtml += '</div>';
+                panel.insertAdjacentHTML('beforeend', msgHtml);
+
+                /* 가장 최신 메시지의 소스/모델 정보 표시 */
+                if(i === messages.length-1){
+                    renderSources(sources);
+                    if(modelInfo.llm){
+                        currentLlmModel = modelInfo.llm || '';
+                        currentEmbedModel = modelInfo.embed || '';
+                    }
+                }
+            }
+            /* 진행 중인 SSE가 있으면 DB에 아직 없는 질의+로딩 행 */
+            _appendPendingStreamRow(sid, panel);
+        }
+    } catch(e) {
+        panel.innerHTML='<div class="analysis-box"><div class="analysis-box-label">오류</div><div class="analysis-box-text" style="color:var(--danger);">대화 이력을 불러올 수 없습니다: '+esc(e.message)+'</div></div>';
+    }
+
+    renderHistoryList();
+    panel.scrollTop = panel.scrollHeight;
+    updateSearchButtonForInflight();
+    /* chat 응답 내 chart_data 차트 렌더링 (DOM 삽입 완료 후 실행) */
+    requestAnimationFrame(function(){ renderPendingCharts(); });
+}
+
+/* DB에 아직 없는 진행 중 질의가 있으면 하단에 로딩 행 추가 */
+function _appendPendingStreamRow(sid, panel){
+    var p=pendingSSEBySession[sid];
+    if(!p||!p.query) return;
+    var qtrim=p.query.trim();
+    var msgs=panel.querySelectorAll('.chat-message');
+    var lastQ='';
+    if(msgs.length){
+        var lt=msgs[msgs.length-1].querySelector('.chat-query-text');
+        if(lt) lastQ=(lt.textContent||'').trim();
+    }
+    if(lastQ===qtrim) return;
+    var modelLabel=document.getElementById('modelSelect');
+    var spinTxt=modelLabel&&modelLabel.options[modelLabel.selectedIndex] ? modelLabel.options[modelLabel.selectedIndex].textContent : '분석';
+    var h='<div class="chat-message" data-pending-sse="1">';
+    h+='<div class="chat-query"><div class="chat-query-icon">Q</div><div class="chat-query-text">'+esc(p.query)+'</div><div class="chat-query-chips">'+buildQueryChips(activeCategory, null, 'rag')+'</div></div>';
+    h+='<div class="chat-answer"><div class="loading-state"><div class="loading-spinner"></div><div class="loading-text">'+esc(spinTxt)+' 분석 중...</div></div></div></div>';
+    panel.insertAdjacentHTML('beforeend', h);
+    panel.scrollTop=panel.scrollHeight;
+}
+
+async function deleteSession(sid, evt){
+    evt.stopPropagation();
+    try {
+        await fetch('/api/history/'+encodeURIComponent(sid), {method:'DELETE'});
+    } catch(e){}
+    /* 목록에서 제거 */
+    dbSessions = dbSessions.filter(function(s){ return s.session_id !== sid; });
+    if(currentSessionId===sid) newSession();
+    else renderHistoryList();
+}
+
+function renderHistoryList(){
+    var el=document.getElementById('historyList');
+    if(dbSessions.length===0){
+        el.innerHTML='<div class="history-empty">아직 대화 기록이 없습니다</div>';
+        return;
+    }
+    var h='';
+    for(var i=0; i<dbSessions.length; i++){
+        var s=dbSessions[i];
+        var active = s.session_id===currentSessionId ? 'active' : '';
+        h+='<div class="history-item '+active+'" onclick="loadSession(\''+esc(s.session_id)+'\')">';
+        h+='<div class="history-item-icon">&#9671;</div>';
+        h+='<div class="history-item-title">'+esc(s.title||'새 대화')+'</div>';
+        h+='<div class="history-item-meta"><span>'+s.message_count+'개</span><span class="history-item-delete" onclick="deleteSession(\''+esc(s.session_id)+'\',event)">&#10005;</span></div>';
+        h+='</div>';
+    }
+    el.innerHTML=h;
+}
+
+/* DB에서 세션 목록 로드 */
+async function loadHistoryFromDB(){
+    try {
+        var resp = await fetch('/api/history');
+        var data = await resp.json();
+        dbSessions = data.sessions || [];
+        renderHistoryList();
+    } catch(e){
+        console.error('히스토리 로드 실패:', e);
+    }
+}
+
+/* 히스토리 목록 갱신 (새 메시지 저장 후 호출) */
+async function refreshHistoryList(){
+    await loadHistoryFromDB();
+    renderHistoryList();
+}
+
+/* ── 검색 실행 ── */
+async function doSearch(){
+    var input=document.getElementById('searchInput'), query=input.value.trim();
+    if(!query)return;
+    if(!currentSessionId){ currentSessionId=genId(); }
+    if(inflightSSEBySession[currentSessionId]) return;
+    input.value='';
+    var panel=document.getElementById('answerPanel');
+    var emptyEl=panel.querySelector('.empty-state');
+    if(emptyEl) panel.innerHTML='';
+    var msgDiv=document.createElement('div');
+    msgDiv.className='chat-message';
+    msgDiv.id='msg-'+Date.now();
+    msgDiv.innerHTML='<div class="chat-query"><div class="chat-query-icon">Q</div><div class="chat-query-text">'+esc(query)+'</div><div class="chat-query-chips">'+buildQueryChips(activeCategory, null, 'rag')+'</div></div><div class="chat-answer"><div class="loading-state"><div class="loading-spinner"></div><div class="loading-text">'+esc(document.getElementById('modelSelect').options[document.getElementById('modelSelect').selectedIndex].textContent)+' 분석 중...</div></div></div>';
+    panel.appendChild(msgDiv);
+    panel.scrollTop = panel.scrollHeight;
+    document.getElementById('sourcesList').innerHTML='';
+    document.getElementById('mcpQuerySection').innerHTML='';
+    var _ss1=document.getElementById('statsSection'); if(_ss1) _ss1.style.display='none';
+    currentTimeFilter=null; currentDataSource='rag'; currentMcpQueries=[]; currentLlmModel=''; currentEmbedModel='';
+    var streamSessionId=currentSessionId;
+    pendingSSEBySession[streamSessionId]={query:query};
+    inflightSSEBySession[streamSessionId]=true;
+    updateSearchButtonForInflight();
+    try{
+        var categories=activeCategory==='all'?null:[activeCategory];
+        var selectedModel=document.getElementById('modelSelect').value;
+        var body={query:query,top_k:5,categories:categories,model_id:selectedModel,session_id:currentSessionId};
+        var resp=await fetch('/api/chat',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
+        if(!resp.ok)throw new Error('API 요청 실패 ('+resp.status+')');
+        await handleSSE(resp,query,msgDiv,streamSessionId);
+    }catch(err){
+        delete pendingSSEBySession[streamSessionId];
+        if(msgDiv.isConnected&&msgDiv.querySelector('.chat-answer')){
+            msgDiv.querySelector('.chat-answer').innerHTML='<div class="analysis-box"><div class="analysis-box-label">오류</div><div class="analysis-box-text" style="color:var(--danger);">'+esc(err.message)+'</div></div>';
+        } else if(currentSessionId===streamSessionId){
+            loadSession(streamSessionId);
+        }
+    }
+    finally{
+        delete inflightSSEBySession[streamSessionId];
+        updateSearchButtonForInflight();
+        input.value='';
+        input.focus();
+    }
+}
+
+// v18: 재문의 응답 선택/입력 후 원본 질의와 결합하여 재전송
+async function answerClarify(originalQuery, clarifyAnswer, msgDiv){
+    if(!clarifyAnswer||!clarifyAnswer.trim()) return;
+    clarifyAnswer=clarifyAnswer.trim();
+    if(inflightSSEBySession[currentSessionId]) return;
+    var answerEl=msgDiv.querySelector('.chat-answer');
+    answerEl.innerHTML='<div class="loading-state"><div class="loading-spinner"></div><div class="loading-text">분석 중...</div></div>';
+    // 재문의 응답 표시 (질의에 추가)
+    var qEl=msgDiv.querySelector('.chat-query-text');
+    if(qEl) qEl.innerHTML=esc(originalQuery)+'<span class="clarify-selected"> → '+esc(clarifyAnswer)+'</span>';
+    document.getElementById('sourcesList').innerHTML='';
+    document.getElementById('mcpQuerySection').innerHTML='';
+    var _ss2=document.getElementById('statsSection'); if(_ss2) _ss2.style.display='none';
+    currentTimeFilter=null; currentDataSource='rag'; currentMcpQueries=[]; currentLlmModel=''; currentEmbedModel='';
+    var categories=activeCategory==='all'?null:[activeCategory];
+    var selectedModel=document.getElementById('modelSelect').value;
+    var body={query:originalQuery,top_k:5,categories:categories,model_id:selectedModel,session_id:currentSessionId,clarify_answer:clarifyAnswer};
+    var streamSessionId=currentSessionId;
+    pendingSSEBySession[streamSessionId]={query:(originalQuery+' '+clarifyAnswer).trim()};
+    inflightSSEBySession[streamSessionId]=true;
+    updateSearchButtonForInflight();
+    try{
+        var resp=await fetch('/api/chat',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
+        if(!resp.ok)throw new Error('API 오류 ('+resp.status+')');
+        await handleSSE(resp,originalQuery+' '+clarifyAnswer,msgDiv,streamSessionId);
+    }catch(err){
+        delete pendingSSEBySession[streamSessionId];
+        if(answerEl&&msgDiv.isConnected){
+            answerEl.innerHTML='<div class="analysis-box"><div class="analysis-box-label">오류</div><div class="analysis-box-text" style="color:var(--danger);">'+esc(err.message)+'</div></div>';
+        } else if(currentSessionId===streamSessionId){
+            loadSession(streamSessionId);
+        }
+    } finally{
+        delete inflightSSEBySession[streamSessionId];
+        updateSearchButtonForInflight();
+    }
+}
+
+async function handleSSE(response,query,msgDiv,streamSessionId){
+    if(!streamSessionId) streamSessionId=currentSessionId;
+    var reader=response.body.getReader(), decoder=new TextDecoder();
+    var buffer='', queryType='general', resultData=null, sources=[], metaData=null;
+    var answerEl=msgDiv.querySelector('.chat-answer');
+    var doneHandled=false;  /* 중복 done 처리 방지 */
+    outer:
+    while(true){
+        var rd=await reader.read(); if(rd.done)break;
+        buffer+=decoder.decode(rd.value,{stream:true});
+        var lines=buffer.split('\n'); buffer=lines.pop()||'';
+        for(var i=0;i<lines.length;i++){
+            var line=lines[i];
+            if(line.indexOf('data: ')!==0)continue;
+            try{
+                var d=JSON.parse(line.substring(6).trim());
+                if(d.type==='meta'){
+                    metaData=d;
+                    queryType=d.query_type;
+                    currentTimeFilter=d.time_filter||null;
+                    currentDataSource=d.data_source||'rag';
+                    currentMcpQueries=d.mcp_queries||[];
+                    currentLlmModel=d.llm_model||'';
+                    currentEmbedModel=d.embed_model||'';
+                    if(msgDiv.isConnected&&answerEl){
+                        answerEl.innerHTML='<div class="loading-state"><div class="loading-spinner"></div><div class="loading-text">'+getSourceLabel(currentDataSource)+' | '+getTypeLabel(queryType)+(currentTimeFilter?' | '+currentTimeFilter:'')+' | 분석 생성 중...</div></div>';
+                    }
+                }
+                if(d.type==='progress'){
+                    // Phase 2-C: tool 호출 실시간 표시
+                    if(msgDiv.isConnected&&answerEl){
+                        var el2=answerEl.querySelector('.loading-text');
+                        if(el2){
+                            var kr=d.tool_kr||d.tool||'';
+                            el2.innerHTML='<span class="progress-step">● '+esc(d.message||kr+' 조회 중…')+'</span>';
+                        }
+                    }
+                }
+                if(d.type==='result'){
+                    resultData=d.data;
+                    if(d.response_meta) window._lastResponseMeta=d.response_meta;  // Phase 2-A
+                    if(d.suggested_queries && Array.isArray(d.suggested_queries)) window._lastSuggestedQueries=d.suggested_queries;  // Phase 3-B
+                }
+                if(d.type==='sources') sources=d.data||[];
+                if(d.type==='error'){
+                    delete pendingSSEBySession[streamSessionId];
+                    if(msgDiv.isConnected&&answerEl){
+                        answerEl.innerHTML='<div class="analysis-box"><div class="analysis-box-label">오류</div><div class="analysis-box-text" style="color:var(--danger);">'+esc(d.message)+'</div></div>';
+                    }
+                    await refreshHistoryList();
+                    if(currentSessionId===streamSessionId){
+                        await loadSession(streamSessionId);
+                    }
+                    break outer;
+                }
+                if(d.type==='meta_update'){ currentMcpQueries=d.mcp_queries||[]; }
+                // v17: 재문의 이벤트 처리
+                if(d.type==='clarify'){
+                    delete pendingSSEBySession[streamSessionId];
+                    var cd=d.data, oq=d.original_query||query;
+                    if(msgDiv.isConnected&&answerEl){
+                        answerEl.innerHTML=renderClarify(cd, oq, msgDiv);
+                    }
+                    return;
+                }
+                if(d.type==='done' && !doneHandled){
+                    doneHandled=true;
+                    delete pendingSSEBySession[streamSessionId];
+                    renderSources(sources); renderMcpQueries();
+                    await refreshHistoryList();
+                    if(currentSessionId===streamSessionId){
+                        await loadSession(streamSessionId);
+                    }
+                    break outer;  /* done 처리 즉시 스트림 루프 종료 */
+                }
+            }catch(e){}
+        }
+    }
+    if(!doneHandled){
+        delete pendingSSEBySession[streamSessionId];
+    }
+    if(resultData&&!doneHandled){
+        await refreshHistoryList();
+        if(currentSessionId===streamSessionId){
+            await loadSession(streamSessionId);
+        }
+    }
+    var panel=document.getElementById('answerPanel');
+    if(panel) panel.scrollTop = panel.scrollHeight;
+}
+
+// Phase 3-B: suggested_queries 버튼 렌더링
+function renderSuggestedQueries(queries){
+    if(!queries||!queries.length) return '';
+    var h='<div class="suggested-queries"><span class="suggested-label">추천 질문</span>';
+    queries.forEach(function(q){
+        h+='<button class="suggested-btn" onclick="window._submitSuggestedQuery(this.dataset.q)" data-q="'+esc(q)+'">'+esc(q)+'</button>';
+    });
+    h+='</div>';
+    return h;
+}
+window._submitSuggestedQuery=function(q){
+    var inp=document.getElementById('queryInput')||document.getElementById('searchInput');
+    if(!inp) return;
+    inp.value=q;
+    // 검색 버튼 클릭 트리거
+    var btn=document.getElementById('searchBtn');
+    if(btn) btn.click();
+};
+
+// Phase 2-B: severity → CSS 클래스 변환 헬퍼
+function getSevBadgeClass(sev){
+    if(!sev) return '';
+    var s=sev.toLowerCase();
+    if(s==='disaster') return 'sev-disaster';
+    if(s==='high') return 'sev-high';
+    if(s==='average') return 'sev-average';
+    if(s==='warning') return 'sev-warning';
+    if(s==='ok'||s==='resolved'||s==='정상') return 'sev-ok';
+    return 'sev-info';
+}
+
+// Phase 2-B: details 항목에 severity 배지 렌더링
+function renderSevBadge(item){
+    var sev=item['severity']||item['심각도']||item['Severity']||'';
+    if(!sev||sev.toLowerCase()==='info'||sev.toLowerCase()==='정상') return '';
+    return '<span class="sev-badge '+getSevBadgeClass(sev)+'">'+esc(sev)+'</span>';
+}
+
+// Phase 2-A: response_meta 패널 렌더링
+function renderResponseMetaBar(meta){
+    if(!meta||!meta.tool_count) return '';
+    var confCls='conf-'+( meta.confidence_level||'low');
+    var fresh=meta.freshness_minutes;
+    /* RAG + 실시간 도구 혼용 시: 백엔드가 freshness_mix·freshness_note_kr 제공 — '실시간' 단독 표시 방지 */
+    var freshStr;
+    if(meta.freshness_mix==='rag_plus_live'){
+        freshStr='혼합 (Zabbix 실시간 + 벡터 이력·동기화 지연 가능)';
+    }else{
+        freshStr=fresh<=1?'실시간':fresh<=5?fresh+'분 주기':fresh+'분 이상';
+    }
+    var srcKr=(meta.data_source_kr||[]).join(' · ')||'—';
+    var score=Math.round((meta.confidence_score||0)*100);
+    var fnote=meta.freshness_note_kr||'';
+    var h='<div class="response-meta-bar">';
+    h+='<span class="meta-chip"><span class="meta-chip-icon">🔍</span> 데이터 소스: '+esc(srcKr)+'</span>';
+    h+='<span class="meta-chip"><span class="meta-chip-icon">📊</span> 조회 건수: '+esc(String(meta.record_count||0))+'건</span>';
+    h+='<span class="meta-chip '+confCls+'"><span class="meta-chip-icon">🎯</span> 신뢰도: '+(meta.confidence_level==='high'?'높음':meta.confidence_level==='medium'?'보통':'낮음')+' ('+score+'%)</span>';
+    h+='<span class="meta-chip" title="'+esc(fnote)+'"><span class="meta-chip-icon">⏱</span> 갱신: '+esc(freshStr)+'</span>';
+    if(fnote && meta.freshness_mix==='rag_plus_live'){
+        h+='<div class="response-meta-hint" style="font-size:11px;color:var(--text-muted);margin-top:6px;line-height:1.45;">'+esc(fnote)+'</div>';
+    }
+    h+='</div>';
+    return h;
+}
+
+function buildResultHtml(data,query){
+    var type=data.query_type||'general';
+    var h='';
+    if(currentTimeFilter) h+='<div class="time-filter-badge">&#128197; 조회 기간: '+esc(currentTimeFilter)+'</div>';
+    // Phase 2-A: response_meta 패널 (window._lastResponseMeta에서 읽기)
+    if(window._lastResponseMeta && window._lastResponseMeta.tool_count>0){
+        h+=renderResponseMetaBar(window._lastResponseMeta);
+        window._lastResponseMeta=null;  // 한 번만 표시
+    }
+    /* v19: query-type-badge / data-source-badge 제거 — chat-query-chips 한 줄에 통합 */
+    h+='<div class="answer-title">'+esc(data.title||query)+'</div>';
+    switch(type){
+        case'status':h+=renderStatus(data);break;
+        case'list':h+=renderList(data);break;
+        case'alert':h+=renderAlert(data);break;
+        case'analysis':h+=renderAnalysis(data);break;
+        case'log':h+=renderLog(data);break;
+        case'process':h+=renderProcess(data);break;
+        default:h+=renderGeneral(data);
+    }
+    /* ── chart_data: 에이전트가 반환한 시각화 블록 렌더링 ── */
+    if(data.chart_data && Array.isArray(data.chart_data) && data.chart_data.length){
+        var chartId='chat-chart-'+Date.now();
+        h+='<div class="chat-charts-wrap" id="'+chartId+'">';
+        data.chart_data.forEach(function(cd, i){
+            h+='<div class="chat-chart-card">'
+              +'<div class="chat-chart-title">'+esc(cd.title||'')+'</div>'
+              +'<canvas id="'+chartId+'-'+i+'" style="max-height:220px;"></canvas>'
+              +(cd.description?'<div class="chart-desc">'+esc(cd.description)+'</div>':'')
+              +'</div>';
+        });
+        h+='</div>';
+        /* Chart.js 렌더는 DOM 삽입 후 실행 — defer via requestAnimationFrame */
+        window._pendingChartData = window._pendingChartData || [];
+        window._pendingChartData.push({ containerId:chartId, charts:data.chart_data });
+    }
+    return h;
+}
+
+/* ── chat 응답 차트 렌더러 (DOM 삽입 후 호출) ── */
+function renderPendingCharts(){
+    if(!window._pendingChartData || !window._pendingChartData.length) return;
+    if(typeof Chart === 'undefined') return;
+    var COLORS = ['#5794f2','#73bf69','#f2cc0c','#ff9830','#f2495c','#b877d9','#56a64b','#e0b400'];
+    window._pendingChartData.forEach(function(item){
+        item.charts.forEach(function(cd, i){
+            var canvas = document.getElementById(item.containerId+'-'+i);
+            if(!canvas) return;
+            var chartType = cd.type || 'bar';
+            var labels = [], datasets = [];
+            if(cd.datasets && cd.datasets.length){
+                /* 다중 데이터셋 (시계열 등) */
+                labels = (cd.datasets[0].data||[]).map(function(p){ return p.x||p.label||String(p); });
+                datasets = cd.datasets.map(function(ds, di){
+                    var vals = (ds.data||[]).map(function(p){ return (typeof p==='object')?(p.y!=null?p.y:p.value):p; });
+                    return { label:ds.label||'', data:vals, backgroundColor:COLORS[di%COLORS.length]+'88',
+                        borderColor:COLORS[di%COLORS.length], borderWidth:1.5, fill:false, tension:0.3 };
+                });
+            } else if(cd.labels && cd.values){
+                labels = cd.labels;
+                datasets = [{ label:cd.y_label||'값', data:cd.values,
+                    backgroundColor:chartType==='line'?'transparent':COLORS.slice(0,cd.values.length).map(function(c){return c+'99';}),
+                    borderColor:chartType==='line'?COLORS[0]:COLORS.slice(0,cd.values.length),
+                    borderWidth:1.5, fill:false, tension:0.3 }];
+            }
+            if(!labels.length) return;
+            var tc='#9fa7b3', gc='rgba(255,255,255,0.07)';
+            new Chart(canvas, {
+                type: chartType==='timeseries'?'line':chartType,
+                data:{ labels:labels, datasets:datasets },
+                options:{
+                    responsive:true, maintainAspectRatio:false,
+                    scales: (chartType==='doughnut'||chartType==='pie') ? {} : {
+                        x:{ ticks:{color:tc,font:{size:10}}, grid:{color:gc} },
+                        y:{ beginAtZero:true, ticks:{color:tc,font:{size:10}}, grid:{color:gc} }
+                    },
+                    plugins:{
+                        legend:{ labels:{color:tc,font:{size:11}} },
+                        title:{ display:!!cd.title, text:cd.title||'', color:tc, font:{size:12} }
+                    }
+                }
+            });
+        });
+    });
+    window._pendingChartData = [];
+}
+
+// ── renderLog: query_type='log' 전용 렌더러 ──
+function renderLog(d){
+    var h='';
+    // 호스트 정보 바
+    var host=d.host||{};
+    if(host.asset||host.ip){
+        h+='<div class="host-info-bar">';
+        if(host.asset)h+='<div class="host-info-item"><span class="host-info-label">자산:</span><span class="host-info-value">'+esc(host.asset)+'</span></div>';
+        if(host.ip)h+='<div class="host-info-item"><span class="host-info-label">IP:</span><span class="host-info-value">'+esc(host.ip)+'</span></div>';
+        if(host.os)h+='<div class="host-info-item"><span class="host-info-label">OS:</span><span class="host-info-value">'+esc(host.os)+'</span></div>';
+        h+='</div>';
+    }
+    // 로그 목록 테이블
+    var logs=d.logs||[];
+    if(logs.length>0){
+        h+='<div class="data-table-wrap"><table class="data-table"><thead><tr>';
+        h+='<th>#</th><th>시각</th><th>로그파일</th><th>심각도</th><th>로그 내용</th>';
+        h+='</tr></thead><tbody>';
+        for(var i=0;i<logs.length;i++){
+            var lg=logs[i];
+            var sevCls=getSevBadgeClass(lg.severity||'');
+            h+='<tr>';
+            h+='<td class="rank-cell">'+(i+1)+'</td>';
+            h+='<td style="white-space:nowrap;font-size:12px;">'+esc(lg.time||'')+'</td>';
+            h+='<td style="white-space:nowrap;font-size:12px;">'+esc(lg.log_file||lg.source||'')+'</td>';
+            h+='<td><span class="sev-badge '+sevCls+'">'+esc(lg.severity||'Info')+'</span></td>';
+            h+='<td class="log-cell">'+esc(lg.content||lg.log||lg.message||'')+'</td>';
+            h+='</tr>';
+        }
+        h+='</tbody></table></div>';
+        // 건수 안내
+        var total=d.total_count||logs.length;
+        h+='<div style="font-size:13px;color:var(--text-muted);margin-bottom:8px;">표시: '+logs.length+'건';
+        if(total>logs.length) h+=' / 전체 '+total+'건';
+        h+='</div>';
+    } else {
+        h+='<div class="analysis-box"><div class="analysis-box-text" style="color:var(--text-muted);">조회된 로그가 없습니다.</div></div>';
+    }
+    // 분석/권장 — summary/analysis/recommendation 또는 answer 폴백
+    var hasSummary = d.summary && d.summary.trim();
+    var hasAnalysis = d.analysis && d.analysis.trim();
+    var hasRec = d.recommendation && d.recommendation.trim();
+    // answer 폴백: summary/analysis 둘 다 없을 때 answer 텍스트를 분석으로 표시
+    var answerFallback = (!hasSummary && !hasAnalysis && d.answer && d.answer.trim()) ? d.answer.trim() : '';
+    if(hasSummary)  h+='<div class="analysis-box"><div class="analysis-box-label">요약</div><div class="analysis-box-text">'+fmtAnalysis(d.summary)+'</div></div>';
+    if(hasAnalysis) h+='<div class="analysis-box"><div class="analysis-box-label">분석</div><div class="analysis-box-text">'+fmtAnalysis(d.analysis)+'</div></div>';
+    if(hasRec)      h+='<div class="analysis-box"><div class="analysis-box-label">권장 조치</div><div class="analysis-box-text">'+fmtAnalysis(d.recommendation)+'</div></div>';
+    if(answerFallback) h+='<div class="analysis-box"><div class="analysis-box-label">분석 요약</div><div class="analysis-box-text">'+fmtAnalysis(answerFallback)+'</div></div>';
+    if(d.measured_at) h+='<div class="measured-at">&#9200; 측정 시각: '+esc(d.measured_at)+'</div>';
+    return h;
+}
+
+// ── renderProcess: query_type='process' 전용 렌더러 ──
+function renderProcess(d){
+    var h='';
+    var host=d.host||{};
+    if(host.asset||host.ip){
+        h+='<div class="host-info-bar">';
+        if(host.asset)h+='<div class="host-info-item"><span class="host-info-label">자산:</span><span class="host-info-value">'+esc(host.asset)+'</span></div>';
+        if(host.ip)h+='<div class="host-info-item"><span class="host-info-label">IP:</span><span class="host-info-value">'+esc(host.ip)+'</span></div>';
+        h+='</div>';
+    }
+    if(d.summary) h+='<div class="analysis-box"><div class="analysis-box-label">요약</div><div class="analysis-box-text">'+fmtAnalysis(d.summary)+'</div></div>';
+    // 지속 프로세스
+    var pp=d.persistent_processes||[];
+    if(pp.length>0){
+        h+='<div class="analysis-box-label" style="margin-bottom:6px;">지속 프로세스</div>';
+        h+='<div class="data-table-wrap"><table class="data-table"><thead><tr><th>#</th><th>프로세스</th><th>CPU</th><th>메모리</th><th>상태</th></tr></thead><tbody>';
+        for(var i=0;i<pp.length;i++){
+            var p=pp[i];
+            h+='<tr><td class="rank-cell">'+(i+1)+'</td><td>'+esc(p.name||p.process||'')+'</td><td>'+esc(String(p.cpu||''))+'</td><td>'+esc(String(p.memory||p.mem||''))+'</td><td>'+esc(p.status||'')+'</td></tr>';
+        }
+        h+='</tbody></table></div>';
+    }
+    if(d.analysis) h+='<div class="analysis-box"><div class="analysis-box-label">분석</div><div class="analysis-box-text">'+fmtAnalysis(d.analysis)+'</div></div>';
+    if(d.recommendation) h+='<div class="analysis-box"><div class="analysis-box-label">권장 조치</div><div class="analysis-box-text">'+fmtAnalysis(d.recommendation)+'</div></div>';
+    if(d.measured_at) h+='<div class="measured-at">&#9200; 측정 시각: '+esc(d.measured_at)+'</div>';
+    return h;
+}
+
+function renderStatus(d){
+    var h='', host=d.host||{};
+    if(host.asset||host.ip){
+        h+='<div class="host-info-bar">';
+        if(host.asset)h+='<div class="host-info-item"><span class="host-info-label">자산:</span><span class="host-info-value">'+esc(host.asset)+'</span></div>';
+        if(host.ip)h+='<div class="host-info-item"><span class="host-info-label">IP:</span><span class="host-info-value">'+esc(host.ip)+'</span></div>';
+        if(host.os)h+='<div class="host-info-item"><span class="host-info-label">OS:</span><span class="host-info-value">'+esc(host.os)+'</span></div>';
+        if(host.group_name)h+='<div class="host-info-item"><span class="host-info-label">그룹:</span><span class="host-info-value">'+esc(host.group_name)+'</span></div>';
+        h+='</div>';
+    }
+    var vm=filterValidMetrics(d.metrics);
+    if(vm.length>0){
+        h+='<div class="metrics-grid">';
+        for(var i=0;i<vm.length;i++){
+            var m=vm[i], st=(m.status||'normal').toLowerCase(), val=String(m.value==null?'':m.value), nm=val.match(/^([\d.]+)\s*(.*)$/);
+            h+='<div class="metric-card status-'+st+'"><div class="metric-card-label">'+esc(m.label)+'</div>';
+            if(nm) h+='<div class="metric-card-value">'+nm[1]+'<span class="metric-card-unit">'+esc(nm[2]||m.unit||'')+'</span></div>';
+            else h+='<div class="metric-card-value" style="font-size:14px;">'+fmtVal(val)+'<span class="metric-card-unit">'+esc(m.unit||'')+'</span></div>';
+            h+='</div>';
+        }
+        h+='</div>';
+    }
+    if(d.analysis) h+='<div class="analysis-box"><div class="analysis-box-label">분석</div><div class="analysis-box-text">'+fmtAnalysis(d.analysis)+'</div></div>';
+    if(d.measured_at) h+='<div class="measured-at">&#9200; 측정 시각: '+esc(d.measured_at)+'</div>';
+    return h;
+}
+
+// ── v16: renderList — 페이지네이션 + 절삭 알림 ──
+var _listPageState={};  // key: tableId → {page,perPage,items,cols,d}
+/** LLM이 label/value + rank 등 메타만 붙인 행 — columns는 항목/내용인데 셀이 비는 문제 방지 */
+function rowIsLabelValueRow(o){
+    if(!o||typeof o!=='object') return false;
+    if(!('label' in o)||!('value' in o)) return false;
+    var allowed={label:1,value:1,rank:1,'순위':1,id:1,_id:1};
+    for(var k in o){
+        if(!Object.prototype.hasOwnProperty.call(o,k)) continue;
+        if(!allowed[k]) return false;
+    }
+    return true;
+}
+function renderList(d){
+    var h='';
+    // ── Phase 1-B: 타임라인 감지 — "이벤트/event/alert_name" 키가 있어야 타임라인 렌더링
+    // "시각"만 있는 경우(로그 목록 등)는 일반 테이블로 렌더링
+    if(d.items&&d.items.length>0&&d.items[0]&&
+       (d.items[0]['이벤트']!==undefined||d.items[0]['event']!==undefined||d.items[0]['alert_name']!==undefined)){
+        return renderTimeline(d);
+    }
+    if(d.items&&d.items.length>0){
+        // ── [Fix] label/value 원본 items가 전달된 경우 항목/내용 2컬럼으로 변환 ──
+        var rawItems=d.items;
+        var f0=rawItems[0];
+        var colsHint=d.columns&&d.columns.length===2&&d.columns[0]==='항목'&&d.columns[1]==='내용';
+        var isKV=!!(f0&&rowIsLabelValueRow(f0));
+        if(!isKV&&colsHint&&f0&&('label' in f0)&&('value' in f0)) isKV=true;
+        if(isKV){
+            rawItems=rawItems.map(function(it){return{'항목':it.label,'내용':it.value};});
+        }
+        // 또는 agent.py에서 이미 항목/내용으로 변환된 경우도 KV 스타일 적용 (rank/순위 등만 부가 키)
+        if(!isKV&&f0&&f0['항목']!==undefined&&f0['내용']!==undefined){
+            var okKr=true;
+            for(var kr in f0){ if(!Object.prototype.hasOwnProperty.call(f0,kr)) continue;
+                if(kr!=='항목'&&kr!=='내용'&&kr!=='rank'&&kr!=='순위'&&kr!=='id'&&kr!=='_id'){ okKr=false; break; }
+            }
+            if(okKr) isKV=true;
+        }
+        var tableId='tbl_'+(Math.random()*1e9|0);
+        // 100건 이하 목록은 한 페이지에 모두 표시(20건 고정 시 '총 N건' vs 첫 페이지만 보임 모순 방지)
+        var perPage=isKV?rawItems.length:(rawItems.length<=100?rawItems.length:25);
+        var totalItems=rawItems.length;
+        var totalCount=d.total_count||totalItems;
+        var cols=d.columns&&d.columns.length>0?d.columns:guessColumns(rawItems);
+        _listPageState[tableId]={page:0,perPage:perPage,items:rawItems,cols:cols,d:d,isKV:isKV};
+        h+='<div id="'+tableId+'_wrap">';
+        h+=_renderListPage(tableId,0);
+        // 총 건수 + 절삭 알림
+        h+='<div style="font-size:13px;color:var(--text-muted);margin-bottom:8px;">';
+        h+='표시: '+totalItems+'건';
+        if(totalCount>totalItems) h+=' / 전체 '+totalCount+'건 <span style="color:var(--warning);font-weight:bold;">('+( totalCount-totalItems)+'건 생략됨 — 데이터가 많아 일부 항목이 잘렸습니다)</span>';
+        else h+=' / 전체 '+totalCount+'건';
+        h+='</div>';
+        h+='</div>';
+    }
+    if(d.analysis) h+='<div class="analysis-box"><div class="analysis-box-label">분석</div><div class="analysis-box-text">'+fmtAnalysis(d.analysis)+'</div></div>';
+    if(d.measured_at) h+='<div class="measured-at">&#9200; 측정 시각: '+esc(d.measured_at)+'</div>';
+    return h;
+}
+function _renderListPage(tableId,page){
+    var st=_listPageState[tableId];
+    if(!st) return '';
+    var items=st.items, cols=st.cols, perPage=st.perPage;
+    var isKVTable=!!(st.isKV);
+    var kvClass=isKVTable?' kv-table':'';
+    var totalPages=Math.ceil(items.length/perPage);
+    page=Math.max(0,Math.min(page,totalPages-1));
+    st.page=page;
+    var start=page*perPage, end=Math.min(start+perPage,items.length);
+    var h='<div class="data-table-wrap"><table class="data-table'+kvClass+'"><thead><tr><th>#</th>';
+    for(var c=0;c<cols.length;c++){
+        if(cols[c]==='\uc21c\uc704'||cols[c]==='rank') h+='<th style="display:none;"></th>';
+        else h+='<th>'+esc(cols[c])+'</th>';
+    }
+    h+='</tr></thead><tbody>';
+    for(var i=start;i<end;i++){
+        var item=items[i];
+        var rankVal=item.rank||item['\uc21c\uc704']||(i+1);
+        h+='<tr><td class="rank-cell">'+(isKVTable?'':esc(String(rankVal)))+'</td>';
+        for(var c=0;c<cols.length;c++){
+            var cn=cols[c], val='';
+            if(cn==='\uc21c\uc704'||cn==='rank'){ h+='<td style="display:none;"></td>'; continue; }
+            val=getItemValue(item,cn);
+            var style='';
+            if((cn.indexOf('사용률')>=0||cn.indexOf('util')>=0)&&parseFloat(val)>10) style=' style="color:var(--warning);font-weight:bold;"';
+            if(cn.indexOf('트래픽')>=0||cn.indexOf('수신')>=0||cn.indexOf('송신')>=0) style=' style="white-space:nowrap;"';
+            // 로그 내용 컬럼 감지 — log-cell 클래스 적용 (줄바꿈 처리)
+            var isLogCol=(cn==='log'||cn==='로그'||cn==='content'||cn==='내용'||cn==='message'||cn==='메시지'||
+                          cn==='log_content'||cn==='로그내용'||cn==='로그 내용'||cn==='원문'||cn==='log_message');
+            // Phase 2-B: severity/심각도 컬럼은 배지로 표시
+            var isSevCol=(cn==='severity'||cn==='심각도'||cn==='Severity');
+            if(isSevCol && val){
+                h+='<td><span class="sev-badge '+getSevBadgeClass(val)+'">'+esc(val)+'</span></td>';
+            } else if(isLogCol && val){
+                // 로그 내용 셀: 줄바꿈 허용
+                h+='<td class="log-cell">'+esc(val)+'</td>';
+            } else {
+                // Phase 2-B: 행 전체에 severity 배지를 마지막 셀 뒤에 추가 (이벤트 컬럼)
+                var sevExtra='';
+                if(c===cols.length-1 && !item['severity'] && !item['심각도']){ sevExtra=''; }
+                h+='<td'+style+'>'+esc(val)+sevExtra+'</td>';
+            }
+        }
+        h+='</tr>';
+    }
+    h+='</tbody></table></div>';
+    // 페이지네이션 컨트롤 (2페이지 이상일 때만 표시)
+    if(totalPages>1){
+        h+='<div class="pagination-bar" style="display:flex;align-items:center;gap:6px;margin:6px 0 4px 0;flex-wrap:wrap;">';
+        h+='<button class="page-btn" onclick="_goListPage(\''+tableId+'\',0)" '+(page===0?'disabled':'')+' title="첫 페이지">&#171;</button>';
+        h+='<button class="page-btn" onclick="_goListPage(\''+tableId+'\','+(page-1)+')" '+(page===0?'disabled':'')+' title="이전">&#8249;</button>';
+        // 페이지 번호 표시 (최대 7개)
+        var winStart=Math.max(0,page-3), winEnd=Math.min(totalPages,winStart+7);
+        winStart=Math.max(0,winEnd-7);
+        for(var p=winStart;p<winEnd;p++){
+            var active=(p===page);
+            h+='<button class="page-btn'+(active?' page-btn-active':'')+'" onclick="_goListPage(\''+tableId+'\','+p+')">'+(p+1)+'</button>';
+        }
+        h+='<button class="page-btn" onclick="_goListPage(\''+tableId+'\','+(page+1)+')" '+(page>=totalPages-1?'disabled':'')+' title="다음">&#8250;</button>';
+        h+='<button class="page-btn" onclick="_goListPage(\''+tableId+'\','+(totalPages-1)+')" '+(page>=totalPages-1?'disabled':'')+' title="마지막 페이지">&#187;</button>';
+        h+='<span style="font-size:12px;color:var(--text-muted);margin-left:4px;">'+(page+1)+' / '+totalPages+' 페이지</span>';
+        h+='</div>';
+    }
+    return h;
+}
+function _goListPage(tableId,page){
+    var st=_listPageState[tableId];
+    if(!st) return;
+    var wrap=document.getElementById(tableId+'_wrap');
+    if(!wrap) return;
+    // wrap 내부에서 table+pagination만 교체 (총 건수 div는 유지)
+    var newHtml=_renderListPage(tableId,page);
+    // 첫 번째 자식(테이블+페이지네이션)을 교체
+    var tmp=document.createElement('div');
+    tmp.innerHTML=newHtml;
+    // wrap의 첫 번째 요소들(table-wrap + pagination-bar)을 새것으로 교체
+    var oldTableWrap=wrap.querySelector('.data-table-wrap');
+    var oldPagBar=wrap.querySelector('.pagination-bar');
+    var newTableWrap=tmp.querySelector('.data-table-wrap');
+    var newPagBar=tmp.querySelector('.pagination-bar');
+    if(oldTableWrap&&newTableWrap) oldTableWrap.parentNode.replaceChild(newTableWrap,oldTableWrap);
+    if(newPagBar){
+        if(oldPagBar) oldPagBar.parentNode.replaceChild(newPagBar,oldPagBar);
+        else if(newTableWrap&&newTableWrap.parentNode) newTableWrap.parentNode.insertBefore(newPagBar,newTableWrap.nextSibling);
+    } else if(oldPagBar){
+        oldPagBar.remove();
+    }
+}
+
+function getItemValue(item,col){
+    // 1순위: item에 col 키가 직접 있는 경우 (LLM이 한국어 키로 반환한 경우)
+    if(item[col]!==undefined&&item[col]!==null&&item[col]!=='') return String(item[col]);
+    // columns=항목/내용 인데 행이 label/value 로만 온 경우 (서버·LLM 불일치)
+    if(col==='항목'&&item.label!=null) return String(item.label);
+    if(col==='내용'&&item.value!=null) return String(item.value);
+    // 2순위: 영문 필드명 매핑 (기존 영문 키 호환)
+    var map={
+        '자산명':['host','asset_name'],'IP':['ip'],'호스트':['host'],
+        '인터페이스':['interface','interface_name','iface'],'Alias':['alias'],
+        'Link 상태':['link_status','link','status'],'링크':['link_status','link','status'],
+        '링크 상태':['link_status','link','status'],
+        '대역폭':['bandwidth','speed_fmt'],'속도':['bandwidth','speed_fmt','speed'],
+        '수신 트래픽':['traffic_in','rx','recv','수신'],'송신 트래픽':['traffic_out','tx','send','송신'],
+        '수신':['traffic_in','rx','recv'],'송신':['traffic_out','tx','send'],
+        '트래픽':['traffic'],'수신 사용률':['util_in'],'송신 사용률':['util_out'],
+        '변동성(In)':['std_in'],'변동성(Out)':['std_out'],
+        '에러':['errors','in_errors','out_errors','error'],
+        '수신 에러':['in_errors'],'송신 에러':['out_errors'],
+        '포트':['port','interface'],'상태':['status','link_status'],
+        '순위':['rank'],'OS':['os'],'그룹':['group','group_name'],
+    };
+    var keys=map[col];
+    if(keys){
+        for(var k=0;k<keys.length;k++){
+            var v=item[keys[k]];
+            if(v!==undefined&&v!==null&&v!=='') return String(v);
+        }
+    }
+    // 3순위: values 서브객체
+    if(item.values&&item.values[col]!==undefined) return String(item.values[col]);
+    // 4순위: 대소문자 무시 키 매칭
+    var lc=col.toLowerCase();
+    for(var key in item){ if(key.toLowerCase()===lc&&item[key]!==null&&item[key]!==undefined) return String(item[key]); }
+    return '';
+}
+
+function guessColumns(items){
+    if(!items||items.length===0)return[];
+    var f=items[0];
+    // ── [Fix] label/value 구조 → '항목'/'내용' 2컬럼으로 렌더링 ──
+    // agent.py에서 label/value items가 list로 전달되는 경우 컬럼 없음 방지
+    if(rowIsLabelValueRow(f)) return['항목','내용'];
+    // ── [Fix] 한국어 키 포함 일반 동적 객체 → 키 순서대로 컬럼 생성 ──
+    // label/value 구조가 아닌 경우(가로 테이블 행) → 키 순서대로 컬럼 생성
+    var keys=Object.keys(f);
+    var nonRankKeys=keys.filter(function(k){return k!=='rank';});
+    if(nonRankKeys.length>=2){
+        return nonRankKeys;
+    }
+    // ── 기존 영문 키 기반 컬럼 추정 (하위 호환) ──
+    var cols=[];
+    if(f.host||f.asset_name) cols.push('자산명');
+    if(f.ip) cols.push('IP');
+    if(f.interface||f.interface_name) cols.push('인터페이스');
+    if(f.alias) cols.push('Alias');
+    if(f.link_status) cols.push('Link 상태');
+    if(f.bandwidth) cols.push('대역폭');
+    if(f.traffic_in) cols.push('수신 트래픽');
+    if(f.traffic_out) cols.push('송신 트래픽');
+    if(f.util_in!==undefined) cols.push('수신 사용률');
+    if(f.util_out!==undefined) cols.push('송신 사용률');
+    if(f.std_in!==undefined) cols.push('변동성(In)');
+    if(f.std_out!==undefined) cols.push('변동성(Out)');
+    if(f.os) cols.push('OS');
+    if(f.group||f.group_name) cols.push('그룹');
+    if(f.status&&!f.link_status) cols.push('상태');
+    if(f.port&&!f.interface) cols.push('포트');
+    if(f.values){ var vkeys=Object.keys(f.values); for(var j=0;j<vkeys.length;j++) cols.push(vkeys[j]); }
+    if(cols.length===0) cols.push('정보');
+    return cols;
+}
+
+function renderAlert(d){
+    var h='<div class="alert-summary-bar">';
+    h+='<div class="alert-counter total"><div><div class="alert-counter-value">'+(d.total_count||0)+'</div><div class="alert-counter-label">전체</div></div></div>';
+    h+='<div class="alert-counter active"><div><div class="alert-counter-value">'+(d.active_count||0)+'</div><div class="alert-counter-label">미해결</div></div></div>';
+    h+='<div class="alert-counter resolved"><div><div class="alert-counter-value">'+(d.resolved_count||0)+'</div><div class="alert-counter-label">해결</div></div></div>';
+    h+='</div>';
+    if(d.alerts&&d.alerts.length>0){
+        // ── [Fix] alerts 배열 첫 항목이 label/value 구조인 경우 KV 세로 테이블로 폴백 렌더링 ──
+        var a0=d.alerts[0];
+        var isLVAlert=!!(a0&&a0.label!==undefined&&a0.value!==undefined);
+        if(isLVAlert){
+            // label/value 쌍이 alert 배열에 들어온 비정상 케이스 → KV 테이블로 렌더링
+            h+='<div class="data-table-wrap"><table class="data-table kv-table"><tbody>';
+            for(var i=0;i<d.alerts.length;i++){
+                var a=d.alerts[i];
+                h+='<tr><td>'+esc(a.label||'')+'</td><td>'+esc(a.value||'')+'</td></tr>';
+            }
+            h+='</tbody></table></div>';
+        } else {
+            h+='<div class="timeline">';
+            for(var i=0;i<d.alerts.length;i++){
+                var a=d.alerts[i], lvl=a.severity_level||1;
+                // [Fix] 한국어 필드명 폴백: 서버 정규화 실패 시에도 렌더링 보장
+                var aTime = a.time||a['시각']||a['일시']||a['발생시각']||'';
+                var aSev  = a.severity||a['심각도']||a['등급']||'';
+                var aStatus = a.status||a['상태']||'';
+                var aHost = a.host||a['호스트']||a['서버']||a['장비']||'';
+                var aIp   = a.ip||a['IP']||a['ip']||'';
+                var aName = a.alert_name||a['이벤트']||a['알림명']||a['알림']||a['이벤트명']||'';
+                var aDetail = a.detail||a['관련지표']||a['지표']||a['내용']||'';
+                var sc=getSevClass(aSev);
+                var stLower = aStatus.toLowerCase();
+                var stc = stLower==='active'||stLower==='미해결'?'alert-active':'alert-resolved';
+                var stl = stLower==='active'||stLower==='미해결'?'미해결':'해결';
+                h+='<div class="timeline-item severity-'+lvl+'"><div class="timeline-header"><span class="timeline-time">'+esc(aTime)+'</span><span class="severity-tag '+sc+'">'+esc(aSev)+'</span><span class="alert-status-tag '+stc+'">'+stl+'</span></div>';
+                h+='<div class="timeline-body"><div class="timeline-host">'+esc(aHost)+(aIp?' ('+esc(aIp)+')':'')+'</div><div class="timeline-alert-name">'+esc(aName)+(aDetail?' <span style="color:var(--text-muted);font-size:11px;">— '+esc(aDetail)+'</span>':'')+'</div></div></div>';
+            }
+            h+='</div>';
+        }
+    }
+    if(d.analysis) h+='<div class="analysis-box" style="margin-top:16px;"><div class="analysis-box-label">분석</div><div class="analysis-box-text">'+fmtAnalysis(d.analysis)+'</div></div>';
+    if(d.measured_at) h+='<div class="measured-at">&#9200; 측정 시각: '+esc(d.measured_at)+'</div>';
+    return h;
+}
+
+function getSevClass(s){ s=(s||'').toLowerCase(); if(s==='disaster')return'severity-disaster'; if(s==='high')return'severity-high'; if(s==='average')return'severity-average'; if(s==='warning')return'severity-warning'; return'severity-information'; }
+
+function renderAnalysis(d){
+    // ── Phase 1-B: 분석 타입도 타임라인 감지 — "이벤트/event/alert_name" 키가 있어야 타임라인으로 위임 ──
+    if(d.items&&d.items.length>0&&d.items[0]&&
+       (d.items[0]['이벤트']!==undefined||d.items[0]['event']!==undefined||d.items[0]['alert_name']!==undefined)){
+        return renderTimeline(d);
+    }
+    var h='';
+    if(d.summary) h+='<div class="analysis-box"><div class="analysis-box-label">요약</div><div class="analysis-box-text">'+fmtAnalysis(d.summary)+'</div></div>';
+
+    // v14: items가 있으면 날짜 그룹화된 분석 표로 렌더링 (metric-card 대신 표 우선)
+    if(d.items&&d.items.length>0){
+        var cols=d.columns&&d.columns.length>0?d.columns:guessColumns(d.items);
+        // 날짜 열을 맨 앞으로 정렬
+        var dateCols=cols.filter(function(c){return c==='날짜'||c==='일시'||c==='시각'||c==='date';});
+        var otherCols=cols.filter(function(c){return dateCols.indexOf(c)<0;});
+        cols=dateCols.concat(otherCols);
+        h+='<div class="data-table-wrap"><table class="data-table"><thead><tr>';
+        for(var c=0;c<cols.length;c++) h+='<th>'+esc(cols[c])+'</th>';
+        h+='</tr></thead><tbody>';
+        for(var i=0;i<d.items.length;i++){
+            var item=d.items[i];
+            h+='<tr>';
+            for(var c=0;c<cols.length;c++){
+                var colName=cols[c];
+                var raw=item[colName];
+                var val=(raw!=null&&raw!=='')?String(raw):getItemValue(item,colName);
+                if(val===''||val==null) val='—';
+                var isLogColA=(colName==='log'||colName==='로그'||colName==='content'||colName==='내용'||
+                               colName==='message'||colName==='메시지'||colName==='log_content'||colName==='원문');
+                // 날짜 열은 강조
+                if(dateCols.indexOf(colName)>=0)
+                    h+='<td style="font-weight:600;white-space:nowrap;">'+esc(String(val))+'</td>';
+                else if(isLogColA)
+                    h+='<td class="log-cell">'+esc(String(val))+'</td>';
+                else
+                    h+='<td>'+esc(String(val))+'</td>';
+            }
+            h+='</tr>';
+        }
+        h+='</tbody></table></div>';
+    } else {
+        // items 없음: label/value → metric-card 그리드 (기존 동작 유지)
+        var isLabelValue=d.details&&d.details.length>0&&d.details[0].label!==undefined&&d.details[0].value!==undefined;
+        if(isLabelValue){
+            h+='<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,240px));gap:10px;margin-bottom:16px;">';
+            for(var i=0;i<d.details.length;i++){
+                var dt=d.details[i];
+                h+='<div class="metric-card"><div class="metric-card-label">'+esc(dt.label||'')+'</div><div class="metric-card-value" style="font-size:14px;font-weight:600;">'+fmtVal(String(dt.value||''))+'</div></div>';
+            }
+            h+='</div>';
+        }
+    }
+
+    if(d.analysis) h+='<div class="analysis-box"><div class="analysis-box-label">분석</div><div class="analysis-box-text">'+fmtAnalysis(d.analysis)+'</div></div>';
+    if(d.recommendation) h+='<div class="analysis-box"><div class="analysis-box-label">권장 조치</div><div class="analysis-box-text">'+fmtAnalysis(d.recommendation)+'</div></div>';
+    if(d.measured_at) h+='<div class="measured-at">&#9200; 측정 시각: '+esc(d.measured_at)+'</div>';
+    return h;
+}
+
+function renderTimeline(d){
+    // Phase 1-B: 이벤트 타임라인 렌더링
+    // details 항목에 "시각" 또는 "이벤트" 필드가 있는 경우 시간축 타임라인으로 표시
+    var h='';
+    if(d.summary) h+='<div class="analysis-box"><div class="analysis-box-label">요약</div><div class="analysis-box-text">'+fmtAnalysis(d.summary)+'</div></div>';
+    if(d.items&&d.items.length>0){
+        h+='<div class="timeline tl-event">';
+        for(var i=0;i<d.items.length;i++){
+            var ev=d.items[i];
+            var sev=(ev['심각도']||ev['severity']||'Info').toLowerCase();
+            var sevCls=sev.indexOf('critical')>=0||sev.indexOf('disaster')>=0?'severity-disaster':
+                       sev.indexOf('warning')>=0||sev.indexOf('경고')>=0?'severity-warning':
+                       sev.indexOf('error')>=0||sev.indexOf('high')>=0?'severity-high':'severity-information';
+            var lvl=sev.indexOf('critical')>=0||sev.indexOf('disaster')>=0?5:
+                    sev.indexOf('error')>=0||sev.indexOf('high')>=0?4:
+                    sev.indexOf('warning')>=0||sev.indexOf('경고')>=0?3:1;
+            var timeStr=esc(ev['시각']||ev['time']||ev['timestamp']||'');
+            var evtStr=esc(ev['이벤트']||ev['event']||ev['alert_name']||ev['로그']||ev['log']||'');
+            var metricStr=esc(ev['관련지표']||ev['관련 지표']||ev['metrics']||ev['발생원']||ev['source']||'');
+            var statusStr=esc(ev['상태']||ev['status']||'');
+            h+='<div class="timeline-item severity-'+lvl+'">';
+            h+='<div class="timeline-header" style="flex-wrap:wrap;align-items:center;justify-content:flex-start;">';
+            if(timeStr) h+='<span class="timeline-time">'+timeStr+'</span>';
+            if(sev!=='info'&&sev!=='normal'&&sev!=='정상') h+='<span class="severity-tag '+sevCls+'">'+esc(ev['심각도']||ev['severity']||'')+'</span>';
+            if(evtStr) h+='<span class="timeline-alert-name" style="margin:0 0 0 8px;flex:1;min-width:0;word-break:break-all;white-space:normal;">'+evtStr+(metricStr?'<span class="timeline-alert-sub"> | '+metricStr+'</span>':'')+'</span>';
+            if(statusStr) h+='<span class="alert-status-tag '+(statusStr==='미해결'||statusStr.toLowerCase()==='active'?'alert-active':'alert-resolved')+'" style="margin-left:auto;flex-shrink:0;">'+statusStr+'</span>';
+            h+='</div></div>';
+        }
+        h+='</div>';
+    }
+    if(d.analysis) h+='<div class="analysis-box" style="margin-top:16px;"><div class="analysis-box-label">분석</div><div class="analysis-box-text">'+fmtAnalysis(d.analysis)+'</div></div>';
+    if(d.recommendation) h+='<div class="analysis-box"><div class="analysis-box-label">권장 조치</div><div class="analysis-box-text">'+fmtAnalysis(d.recommendation)+'</div></div>';
+    if(d.measured_at) h+='<div class="measured-at">&#9200; 측정 시각: '+esc(d.measured_at)+'</div>';
+    return h;
+}
+
+function renderGeneral(d){
+    var h='', answer=d.answer||d.analysis||d.summary||'';
+    if(d.details&&d.details.length>0){
+        h+='<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,240px));gap:10px;margin-bottom:16px;">';
+        for(var i=0;i<d.details.length;i++){
+            var dt=d.details[i];
+            h+='<div class="metric-card"><div class="metric-card-label">'+esc(dt.label||'')+'</div><div class="metric-card-value" style="font-size:14px;">'+fmtVal(String(dt.value||''))+'</div></div>';
+        }
+        h+='</div>';
+    }
+    if(answer){
+        var paragraphs=answer.split('\n').filter(function(p){return p.trim().length>0;});
+        if(paragraphs.length>1){
+            h+='<div class="general-answer">';
+            for(var j=0;j<paragraphs.length;j++){
+                h+='<p style="margin:6px 0;">'+esc(paragraphs[j])+'</p>';
+            }
+            h+='</div>';
+        } else {
+            h+='<div class="general-answer">'+esc(answer)+'</div>';
+        }
+    }
+    var vmG=filterValidMetrics(d.metrics);
+    if(vmG.length>0){
+        h+='<div class="metrics-grid" style="margin-top:16px;">';
+        for(var i=0;i<vmG.length;i++){ var m=vmG[i], st=(m.status||'normal').toLowerCase(); h+='<div class="metric-card status-'+st+'"><div class="metric-card-label">'+esc(m.label)+'</div><div class="metric-card-value" style="font-size:14px;">'+fmtVal(String(m.value==null?'':m.value))+' <span class="metric-card-unit">'+esc(m.unit||'')+'</span></div></div>'; }
+        h+='</div>';
+    }
+    if(d.note) h+='<div class="general-note">'+esc(d.note)+'</div>';
+    if(d.measured_at) h+='<div class="measured-at">&#9200; 측정 시각: '+esc(d.measured_at)+'</div>';
+    return h;
+}
+
+// v18.1: 재문의 데이터 저장소 (onclick 인라인 제거 → data-* + 이벤트 위임)
+var _clarifyStore = {};
+
+// v18.1: 재문의 UI 렌더링 — data-* 속성 방식 (HTML 속성 내 따옴표 충돌 방지)
+function renderClarify(cd, originalQuery, msgDiv){
+    var mid = msgDiv.id;
+    var inputId = 'ci_' + mid;
+    // 원본 질의를 전역 저장소에 보관 (HTML 속성에 직접 삽입하지 않음)
+    _clarifyStore[mid] = originalQuery;
+
+    var h = '<div class="clarify-box" data-mid="'+mid+'">';
+    h += '<div class="clarify-icon">&#10067;</div>';
+    h += '<div class="clarify-question">'+esc(cd.question||'추가 정보가 필요합니다.')+'</div>';
+    if(cd.buttons && cd.buttons.length > 0){
+        h += '<div class="clarify-buttons">';
+        for(var i = 0; i < cd.buttons.length; i++){
+            // 버튼 텍스트를 data-val 속성에 저장 — onclick 인라인 JS 없음
+            h += '<button class="clarify-btn" data-clarify-btn data-mid="'+mid+'" data-val="'+esc(cd.buttons[i])+'">'+esc(cd.buttons[i])+'</button>';
+        }
+        h += '</div>';
+    }
+    // v18.1: 직접 입력란 — data-* 속성으로 mid 전달
+    h += '<div class="clarify-input-row">';
+    h += '<input id="'+inputId+'" class="clarify-input" type="text" placeholder="직접 입력 (예: server-001)" data-clarify-input data-mid="'+mid+'">';
+    h += '<button class="clarify-send-btn" data-clarify-send data-mid="'+mid+'" data-input-id="'+inputId+'">전송</button>';
+    h += '</div>';
+    h += '</div>';
+    return h;
+}
+
+// v18.1: 재문의 이벤트 위임 — document 레벨에서 한 번만 등록
+(function(){
+    document.addEventListener('click', function(e){
+        // 버튼 클릭
+        var btn = e.target.closest('[data-clarify-btn]');
+        if(btn){
+            var mid = btn.getAttribute('data-mid');
+            var val = btn.getAttribute('data-val');
+            var oq  = _clarifyStore[mid];
+            var el  = document.getElementById(mid);
+            if(oq && el) answerClarify(oq, val, el);
+            return;
+        }
+        // 전송 버튼 클릭
+        var send = e.target.closest('[data-clarify-send]');
+        if(send){
+            var mid     = send.getAttribute('data-mid');
+            var inputId = send.getAttribute('data-input-id');
+            var inp     = document.getElementById(inputId);
+            var val     = inp ? inp.value.trim() : '';
+            var oq      = _clarifyStore[mid];
+            var el      = document.getElementById(mid);
+            if(val && oq && el) answerClarify(oq, val, el);
+            return;
+        }
+    });
+    // Enter 키 위임
+    document.addEventListener('keydown', function(e){
+        if(e.key !== 'Enter') return;
+        var inp = e.target.closest('[data-clarify-input]');
+        if(!inp) return;
+        var val = inp.value.trim();
+        var mid = inp.getAttribute('data-mid');
+        var oq  = _clarifyStore[mid];
+        var el  = document.getElementById(mid);
+        if(val && oq && el) answerClarify(oq, val, el);
+    });
+})();
+
+function formatVectorTablesForSource(vt){
+    if(!vt||!vt.length) return '';
+    return vt.map(function(x){
+        var c=x.count;
+        if(typeof c==='number'&&c>0) return x.table+' ('+c+')';
+        return x.table;
+    }).join(', ');
+}
+
+var _SOURCE_MAX_ZABBIX = 10;
+var _SOURCE_MAX_VECTOR_ROWS = 12;
+
+function _sortVectorByCountDesc(arr){
+    return arr.slice().sort(function(a,b){ return (b.count||0)-(a.count||0); });
+}
+
+function renderSources(sources){
+    var list=document.getElementById('sourcesList');
+    if(!sources||sources.length===0){
+        list.innerHTML='<p style="font-size:13px;color:var(--text-muted);line-height:1.6;">참조된 데이터 소스가 없습니다. Agent 응답은 도구 실행 이력이 있으면 스트림 수신 후 이 영역에 표시됩니다.</p>';
+        return;
+    }
+    var zset=Object.create(null);
+    var zOrder=[];
+    var vsum=Object.create(null);
+    var vOrder=[];
+    var notesSeen=Object.create(null);
+    var noteLines=[];
+    var lastAt='';
+    var totalCountSum=0;
+    for(var i=0;i<sources.length;i++){
+        var s=sources[i];
+        var zt=s.zabbix_tables||[];
+        for(var zi=0;zi<zt.length;zi++){
+            var zn=String(zt[zi]);
+            if(zset[zn]) continue;
+            zset[zn]=1;
+            zOrder.push(zn);
+        }
+        var vv=s.vector_tables||[];
+        for(var vi=0;vi<vv.length;vi++){
+            var row=vv[vi];
+            var tn=row&&row.table!=null?String(row.table):'';
+            if(!tn) continue;
+            if(!(tn in vsum)){
+                vsum[tn]=0;
+                vOrder.push(tn);
+            }
+            var c=typeof row.count==='number'?row.count:0;
+            vsum[tn]+=c;
+        }
+        var nk=s.source_note_kr;
+        if(nk&&!notesSeen[nk]){ notesSeen[nk]=1; noteLines.push(nk); }
+        var ra=s.retrieved_at;
+        if(ra&&(!lastAt||ra>lastAt)) lastAt=ra;
+        if(typeof s.count==='number') totalCountSum+=s.count;
+    }
+    var vvList=vOrder.map(function(t){ return {table:t, count:vsum[t]}; });
+    var vvSorted=_sortVectorByCountDesc(vvList);
+    var vvTotalChunks=0;
+    for(var vc=0;vc<vvSorted.length;vc++){ vvTotalChunks+=(typeof vvSorted[vc].count==='number'?vvSorted[vc].count:0); }
+    var zShow=zOrder;
+    var zExtra=0;
+    if(zOrder.length>_SOURCE_MAX_ZABBIX){
+        zShow=zOrder.slice(0,_SOURCE_MAX_ZABBIX);
+        zExtra=zOrder.length-_SOURCE_MAX_ZABBIX;
+    }
+    var vvShow=vvSorted;
+    var vvExtra=0;
+    if(vvSorted.length>_SOURCE_MAX_VECTOR_ROWS){
+        vvShow=vvSorted.slice(0,_SOURCE_MAX_VECTOR_ROWS);
+        vvExtra=vvSorted.length-_SOURCE_MAX_VECTOR_ROWS;
+    }
+    var summaryParts=[];
+    if(zOrder.length) summaryParts.push('Zabbix '+zOrder.length+'개');
+    if(vvSorted.length) summaryParts.push('벡터 '+vvSorted.length+'개 테이블 · 청크 합계 '+vvTotalChunks);
+    var h='<div class="source-panel source-card">';
+    if(summaryParts.length) h+='<div class="source-ds-summary">'+esc(summaryParts.join(' · '))+(zExtra||vvExtra?' (요약 표시)':'')+'</div>';
+    h+='<div class="source-data-tables">';
+    if(zShow.length) h+='<div class="source-ds"><span class="source-ds-label">Zabbix</span> <span class="source-ds-val">'+esc(zShow.join(', '))+(zExtra?' · 외 '+zExtra+'개':'')+'</span></div>';
+    if(vvShow.length) h+='<div class="source-ds"><span class="source-ds-label">벡터</span> <span class="source-ds-val">'+esc(formatVectorTablesForSource(vvShow))+(vvExtra?' · 외 '+vvExtra+'개 테이블':'')+'</span></div>';
+    if(!zOrder.length&&!vvList.length) h+='<div class="source-ds-note">표시할 출처 테이블 정보가 없습니다.</div>';
+    h+='</div>';
+    for(var ni=0;ni<noteLines.length;ni++) h+='<div class="source-ds-note">'+esc(noteLines[ni])+'</div>';
+    var timeExtra='';
+    if(sources.length>1) timeExtra+=' · 도구 '+sources.length+'회';
+    if(totalCountSum>0) timeExtra+=' · 반환 합계 '+totalCountSum+'건';
+    if(lastAt) h+='<div class="source-time">&#9200; '+esc(lastAt)+timeExtra+'</div>';
+    else if(sources.length) h+='<div class="source-time">도구 '+sources.length+'회'+(totalCountSum>0?' · 반환 합계 '+totalCountSum+'건':'')+'</div>';
+    h+='</div>';
+    list.innerHTML=h;
+}
+
+function renderMcpQueries(){
+    var el=document.getElementById('mcpQuerySection');
+    if(!currentMcpQueries||currentMcpQueries.length===0){ el.innerHTML=''; return; }
+    var h='';
+    for(var i=0;i<currentMcpQueries.length;i++){
+        var q=currentMcpQueries[i];
+        h+='<div class="mcp-query-card"><div class="mcp-tool"><span>&#9889; '+esc(q.tool)+' → '+esc(q.table)+'</span><span class="mcp-tool-status">Success</span></div><div class="mcp-sql">'+esc(q.sql)+'</div><div class="mcp-count">결과: '+q.count+'건</div></div>';
+    }
+    el.innerHTML=h;
+}
+
+function initHistoryToggle(){
+    var hBtn = document.getElementById('historyToggleBtn');
+    var hWrap = document.getElementById('historyListWrap');
+    var hSec = document.getElementById('historySection');
+    if(hBtn && hWrap && hSec){
+        hBtn.addEventListener('click', function(){
+            var visible = !hWrap.classList.contains('is-collapsed');
+            if(visible){
+                hWrap.classList.add('is-collapsed');
+                hSec.classList.remove('history-expanded');
+                hBtn.innerHTML='&#9654;';
+                hBtn.setAttribute('aria-expanded','false');
+                hBtn.title='대화 기록 펼치기';
+            }else{
+                hWrap.classList.remove('is-collapsed');
+                hSec.classList.add('history-expanded');
+                hBtn.innerHTML='&#9660;';
+                hBtn.setAttribute('aria-expanded','true');
+                hBtn.title='대화 기록 접기';
+            }
+        });
+    }
+}
+
+/* ── 초기화: DB에서 이력 로드 ── */
+window.addEventListener('load', async function(){
+    try {
+        currentSessionId = genId();
+        initHistoryToggle();
+        await loadHistoryFromDB();
+        var si = document.getElementById('searchInput');
+        if(si) si.focus();
+    } catch(e) {
+        console.error('[Init] 로드 실패:', e);
+    }
+    // 헬스는 이력 로드와 독립 — 항상 실행
+    checkHealth();
+    setInterval(checkHealth, 60000);
+});
+
+/* ── Health Status 체크 ── */
+async function checkHealth(){
+    try {
+        var resp = await fetch('/api/health/detail');
+        if(!resp.ok) throw new Error('health API 응답 오류: ' + resp.status);
+        var data = await resp.json() || {};
+
+        applyHealth('healthRag',   data.rag_engine);
+        applyHealth('healthVdb',   data.vector_db);
+        applyHealth('healthAgent', data.agent_mesh);
+
+        var now = new Date();
+        var ts = now.getHours().toString().padStart(2,'0') + ':'
+               + now.getMinutes().toString().padStart(2,'0') + ':'
+               + now.getSeconds().toString().padStart(2,'0');
+        var el = document.getElementById('healthLastCheck');
+        if(el) el.textContent = '갱신: ' + ts;
+    } catch(e) {
+        /* 네트워크 오류 시 모두 Error 표시 */
+        ['healthRag','healthVdb','healthAgent'].forEach(function(id){
+            applyHealth(id, {status:'error', label:'Error'});
+        });
+        console.warn('[Health] 체크 실패:', e.message);
+    }
+}
+
+function applyHealth(id, item){
+    /* null/undefined 응답 시에도 예외 없이 표시 (item.label 단독 접근 금지) */
+    if(!item || typeof item !== 'object'){
+        item = { status: 'error', label: 'N/A', detail: 'health 항목 없음' };
+    }
+    var st = item.status != null ? String(item.status).toLowerCase() : 'error';
+    var lbl = (item.label != null && String(item.label) !== '') ? String(item.label) : '';
+    var map = {
+        'healthy':   { cls: 'health-ok',   def: 'Healthy'   },
+        'optimized': { cls: 'health-ok',   def: 'Optimized' },
+        'active':    { cls: 'health-ok',   def: 'Active'    },
+        'partial':   { cls: 'health-warn', def: 'Partial'   },
+        'degraded':  { cls: 'health-warn', def: 'Degraded'  },
+        'timeout':   { cls: 'health-warn', def: 'Timeout'   },
+        'error':     { cls: 'health-err',  def: 'Error'     },
+    };
+    var row = map[st] || { cls: 'health-err', def: 'Error' };
+    var el = document.getElementById(id);
+    if(!el) return;
+    el.className = row.cls;
+    el.textContent = lbl || row.def;
+    el.title = (item.detail != null && String(item.detail) !== '') ? String(item.detail) : '';
+}
+</script>
+</body>
+</html>

@@ -1,0 +1,37 @@
+# 수동 실행: 스테이징/운영 API에 대해 RAG 검색 품질 배치 테스트
+# Secrets 불필요 — workflow 입력으로 베이스 URL 전달
+
+name: RAG search quality
+
+on:
+  workflow_dispatch:
+    inputs:
+      base_url:
+        description: "API 베이스 URL (예: http://192.168.6.24:8000)"
+        required: true
+        default: "http://127.0.0.1:8000"
+      delay_sec:
+        description: "케이스 간 대기(초)"
+        required: false
+        default: "3"
+
+jobs:
+  search-quality:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install requests
+        run: pip install requests
+      - name: Run sync/test_search_quality.py
+        env:
+          TEST_API_BASE_URL: ${{ github.event.inputs.base_url }}
+        run: python sync/test_search_quality.py --delay "${{ github.event.inputs.delay_sec }}"
+      - name: Upload report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: search-quality-report
+          path: artifacts/search_quality_report.json

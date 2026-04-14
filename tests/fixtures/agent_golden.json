@@ -1,0 +1,33 @@
+[
+  {
+    "id": "cpu_hosts",
+    "query": "CPU 사용률이 높은 서버 호스트를 알려줘",
+    "allowed_tools": ["get_server_cpu", "get_server_status", "get_all_assets"],
+    "min_distinct_tools": 1
+  },
+  {
+    "id": "disk_space",
+    "query": "디스크 여유 공간이 부족한 서버가 있나요?",
+    "allowed_tools": ["get_server_filesystem", "get_server_status", "get_all_assets"],
+    "min_distinct_tools": 1
+  },
+  {
+    "id": "alerts_recent",
+    "query": "최근 알림이나 문제 이벤트를 요약해줘",
+    "allowed_tools": ["get_alerts", "correlate_events", "get_server_status"],
+    "min_distinct_tools": 1
+  },
+  {
+    "id": "log_rootcause",
+    "query": "Zabbix server에서 최근 error 로그 원인과 대응을 분석해줘",
+    "allowed_tools": ["get_server_logs", "get_errpt", "search_historical_data"],
+    "required_tools": ["search_historical_data"],
+    "min_distinct_tools": 2
+  },
+  {
+    "id": "comprehensive_anomaly",
+    "query": "서버/네트워크/알림 종합 특이사항을 알려줘",
+    "allowed_tools": ["get_alerts", "get_server_status", "get_network_device", "correlate_events", "search_historical_data"],
+    "min_distinct_tools": 2
+  }
+]

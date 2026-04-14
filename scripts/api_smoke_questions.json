@@ -1,0 +1,16 @@
+{
+  "comment": "api_smoke_chat.py 가 사용하는 샘플. 스테이징/운영 URL은 TEST_API_BASE_URL 또는 --base-url 로만 지정.",
+  "search_queries": [
+    {
+      "query": "서버 목록을 보여줘",
+      "top_k": 5
+    }
+  ],
+  "chat_queries": [
+    {
+      "id": "health_smoke",
+      "query": "현재 모니터링에서 정상 상태인 서버가 몇 대인지 요약해줘",
+      "allowed_tools": ["get_server_status", "get_all_assets", "get_alerts"]
+    }
+  ]
+}

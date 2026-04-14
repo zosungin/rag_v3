@@ -1,0 +1,31 @@
+# FastAPI 및 웹 프레임워크
+fastapi==0.104.1
+uvicorn[standard]==0.24.0
+pydantic==2.5.0
+pydantic-settings==2.1.0
+python-multipart==0.0.6
+
+# 템플릿 엔진
+jinja2==3.1.2
+
+# 데이터베이스
+psycopg2-binary==2.9.9
+sqlalchemy==2.0.23
+pgvector==0.2.4
+asyncpg==0.29.0
+
+# 날짜/시간 유틸리티
+python-dateutil==2.8.2
+
+# HTTP 클라이언트
+requests==2.31.0
+httpx==0.25.2
+
+# 환경 변수 (.env)
+python-dotenv==1.0.0
+
+# Zabbix → RAG 동기화 스케줄러 (sync/scheduler.py)
+APScheduler==3.10.4
+
+# 테스트 (개발/CI)
+pytest==7.4.3

@@ -1,0 +1,54 @@
+from fastapi import FastAPI, HTTPException
+from pydantic import BaseModel
+import httpx
+import os
+
+app = FastAPI(title="RAG API")
+
+OLLAMA_URL = os.getenv("OLLAMA_URL", "http://ollama:11434")
+DATABASE_URL = os.getenv("DATABASE_URL")
+
+class QueryRequest(BaseModel):
+    query: str
+
+class QueryResponse(BaseModel):
+    response: str
+
+@app.get("/")
+async def root():
+    return {"message": "RAG API is running"}
+
+@app.get("/health")
+async def health_check():
+    return {
+        "status": "healthy",
+        "ollama_url": OLLAMA_URL,
+        "database": "connected" if DATABASE_URL else "not configured"
+    }
+
+@app.post("/query", response_model=QueryResponse)
+async def query(request: QueryRequest):
+    try:
+        async with httpx.AsyncClient(timeout=60.0) as client:
+            response = await client.post(
+                f"{OLLAMA_URL}/api/generate",
+                json={
+                    "model": "qwen2.5:0.5b",
+                    "prompt": request.query,
+                    "stream": False
+                }
+            )
+            response.raise_for_status()
+            result = response.json()
+            return QueryResponse(response=result.get("response", ""))
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.get("/models")
+async def list_models():
+    try:
+        async with httpx.AsyncClient() as client:
+            response = await client.get(f"{OLLAMA_URL}/api/tags")
+            return response.json()
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))

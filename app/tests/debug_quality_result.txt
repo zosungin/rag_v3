@@ -1,0 +1,20 @@
+
+============================================================
+질의: 지난 2일 동안 cpu 사용률이 높은 top5 상세 내역을 알려줘
+모델: llama-3.1-8b-instant
+소요: 21.5초
+반복: 2회, Tools: 2건
+⚠ 강제답변: 최대 반복(2회)
+  ❌ search_historical_data({'categories': ['server'], 'period': '2일', 'search_query': 'CPU 사용률 높은 top5', 'top_k': 5})
+  ✅ search_historical_data({'categories': ['server'], 'search_query': 'CPU 사용률 높은 top5', 'top_k': 5})
+query_type: analysis
+metrics: 0건, details: 5건
+
+📋 answer (1930자):
+지난 2일 동안 CPU 사용률이 높은 top5 상세 내역입니다.
+
+지난 2일 동안 CPU 사용률이 높은 top5 내역을 분석한 결과, ollama 프로세스가 761.00%로 가장 높은 CPU 사용률을 기록했습니다. 이에 따라 CPU 사용률이 높은 프로세스를 확인하고, 프로세스를 종료하거나 CPU 사용률을 줄이도록 조치해야 합니다. 또한, CPU 사용률이 높은 프로세스를 확인하고, 프로세스를 종료하거나 CPU 사용률을 줄이도록 조치해야 합니다. CPU 사용률이 높은 프로세스는 프로세스 ID 3466의 /usr/lib/systemd/s
+
+============================================================
+질의: 프로세스별 자원사용현황은 ?
+모델: llama-3.1-8b-instant
